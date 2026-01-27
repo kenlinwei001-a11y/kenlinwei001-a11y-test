@@ -6,24 +6,45 @@ export const INITIAL_CONSTRAINTS: ConstraintCategory[] = [
     id: 'orders',
     name: '订单优先级与交付约束',
     items: [
-      { id: 'c1', label: '订单锁定不做调整', description: '冻结期内订单禁止变更，保障排产稳定性', enabled: true, impactLevel: 'high' },
-      { id: 'c2', label: '战略客户优先分配', description: '高利润/战略级客户优先保障资源分配', enabled: true, impactLevel: 'high' },
-      { id: 'c3', label: '跨基地拆分交付', description: '允许将单个大订单拆分至不同基地生产', enabled: false, impactLevel: 'medium' },
+      { 
+        id: 'c1', 
+        label: '订单锁定不做调整', 
+        description: '冻结期内订单禁止变更，保障排产稳定性', 
+        enabled: true, 
+        impactLevel: 'high',
+        logic: { relationType: 'TRIGGER', attribute: 'status', operator: '=', value: 'LOCKED', actionDescription: 'Reject changes' }
+      },
+      { 
+        id: 'c2', 
+        label: '战略客户优先分配', 
+        description: '高利润/战略级客户优先保障资源分配', 
+        enabled: true, 
+        impactLevel: 'high',
+        logic: { relationType: 'IMPACT', attribute: 'priority', operator: '=', value: 'VIP', actionDescription: 'Allocate first' }
+      },
+      { 
+        id: 'c3', 
+        label: '跨基地拆分交付', 
+        description: '允许将单个大订单拆分至不同基地生产', 
+        enabled: false, 
+        impactLevel: 'medium',
+        logic: { relationType: 'QUERY', attribute: 'volume', operator: '>', value: 10000, actionDescription: 'Split order' }
+      },
     ]
   },
   {
     id: 'production',
     name: '产能与产线约束',
     items: [
-      { id: 'c4', label: '产线专线专用', description: '特定型号仅在认证产线生产，避免频繁转产', enabled: true, impactLevel: 'high' },
-      { id: 'c5', label: '最小批量限制', description: '低于最小经济批量不排产', enabled: true, impactLevel: 'medium' },
+      { id: 'c4', label: '产线专线专用', description: '特定型号仅在认证产线生产，避免频繁转产', enabled: true, impactLevel: 'high', logic: { relationType: 'TRIGGER', actionDescription: 'Limit routing' } },
+      { id: 'c5', label: '最小批量限制', description: '低于最小经济批量不排产', enabled: true, impactLevel: 'medium', logic: { relationType: 'TRIGGER', attribute: 'quantity', operator: '<', value: 500 } },
     ]
   },
   {
     id: 'inventory',
     name: '物料与库存约束',
     items: [
-      { id: 'c7', label: '安全库存硬性红线', description: '低于安全水位立即触发紧急采购', enabled: true, impactLevel: 'high' },
+      { id: 'c7', label: '安全库存硬性红线', description: '低于安全水位立即触发紧急采购', enabled: true, impactLevel: 'high', logic: { relationType: 'TRIGGER', attribute: 'inventoryLevel', operator: '<', value: 2000, actionDescription: 'Trigger PO' } },
     ]
   }
 ];

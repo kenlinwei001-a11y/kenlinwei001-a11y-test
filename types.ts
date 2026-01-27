@@ -48,13 +48,26 @@ export interface ConstraintCategory {
   items: ConstraintItem[];
 }
 
+export type ConstraintRelationType = 'IMPACT' | 'TRIGGER' | 'QUERY';
+
+export interface ConstraintLogic {
+  sourceNodeId?: string; // The "Subject"
+  attribute?: string;    // e.g., 'inventoryLevel'
+  operator?: '>' | '<' | '=' | 'CHANGE';
+  value?: number | string;
+  relationType: ConstraintRelationType; // The "Predicate"
+  targetNodeId?: string; // The "Object"
+  actionDescription?: string;
+}
+
 export interface ConstraintItem {
   id: string;
   label: string;
   description: string;
   enabled: boolean;
   impactLevel: 'low' | 'medium' | 'high';
-  formula?: string; // Mathematical or logical representation
+  formula?: string; // Legacy string representation
+  logic?: ConstraintLogic; // Structured Ontology Logic
 }
 
 // Updated Scenario Interface for Manual Input

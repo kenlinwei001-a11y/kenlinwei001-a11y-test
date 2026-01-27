@@ -111,6 +111,24 @@ function App() {
 
   const handleAddConstraint = (item: ConstraintItem) => {
     setConstraints(prev => {
+        // Check if item already exists (Update mode)
+        let found = false;
+        const updatedConstraints = prev.map(cat => ({
+            ...cat,
+            items: cat.items.map(existingItem => {
+                if (existingItem.id === item.id) {
+                    found = true;
+                    return item; // Replace with updated item
+                }
+                return existingItem;
+            })
+        }));
+
+        if (found) {
+            return updatedConstraints;
+        }
+
+        // Else add as new
         const customCatId = 'custom_rules';
         const exists = prev.find(c => c.id === customCatId);
         

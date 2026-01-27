@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { ConstraintCategory, ConstraintItem, NodeData, NodeType, ScenarioConfig } from '../types';
-import { Settings, Sliders, Activity, Zap, Search, Plus, Save, X, Sparkles, Trash2, List } from 'lucide-react';
+import { ConstraintCategory, ConstraintItem, NodeData, NodeType, ScenarioConfig, ConstraintLogic, ConstraintRelationType } from '../types';
+import { Settings, Sliders, Activity, Zap, Search, Plus, Save, X, Sparkles, Trash2, List, Edit2, ArrowDown, GitCommit, Database as DbIcon, Link as LinkIcon, AlertTriangle } from 'lucide-react';
 
 interface Props {
   constraints: ConstraintCategory[];
@@ -26,18 +26,33 @@ const ConstraintPanel: React.FC<Props> = ({
   // Multi-Scenario State
   const [pendingScenarios, setPendingScenarios] = useState<ScenarioConfig[]>([]);
 
-  // Builder Form State
-  const [selectedType, setSelectedType] = useState<string>('SUPPLY_DELAY'); // Scenario Type
+  // Scenario Builder Form State
+  const [selectedType, setSelectedType] = useState<string>('SUPPLY_DELAY'); 
   const [selectedNodeId, setSelectedNodeId] = useState<string>('');
   const [formParams, setFormParams] = useState<any>({});
   
-  // New Constraint Creation State
-  const [isCreatingConstraint, setIsCreatingConstraint] = useState(false);
+  // Constraint Logic Builder State
+  const [isEditingConstraint, setIsEditingConstraint] = useState(false);
+  const [editMode, setEditMode] = useState<'create' | 'edit'>('create');
+  
+  // The Constraint being edited
+  const [currentConstraint, setCurrentConstraint] = useState<ConstraintItem>({
+      id: '',
+      label: '',
+      description: '',
+      enabled: true,
+      impactLevel: 'medium',
+      logic: {
+          relationType: 'IMPACT',
+          operator: '>'
+      }
+  });
+
+  // AI Parsing State
   const [newConstraintText, setNewConstraintText] = useState('');
   const [analyzingConstraint, setAnalyzingConstraint] = useState(false);
-  const [parsedConstraint, setParsedConstraint] = useState<Partial<ConstraintItem> | null>(null);
 
-  // Computed properties for the builder
+  // Computed properties for the Scenario builder
   let targetNodeType = NodeType.SUPPLIER;
   if (selectedType === 'DEMAND_CHANGE') targetNodeType = NodeType.CUSTOMER;
   if (selectedType === 'PRODUCTION_ISSUE' || selectedType === 'INVENTORY_ISSUE') targetNodeType = NodeType.BASE;
@@ -85,7 +100,6 @@ const ConstraintPanel: React.FC<Props> = ({
     };
 
     setPendingScenarios([...pendingScenarios, newScenario]);
-    // Reset selection slightly to allow adding another
     setSelectedNodeId('');
   };
 
@@ -98,31 +112,65 @@ const ConstraintPanel: React.FC<Props> = ({
       onRunSimulation(pendingScenarios);
   };
 
+  // === Constraint Logic Builder Functions ===
+
+  const handleStartCreateConstraint = () => {
+      setEditMode('create');
+      setCurrentConstraint({
+          id: `custom-${Date.now()}`,
+          label: '',
+          description: '',
+          enabled: true,
+          impactLevel: 'medium',
+          logic: { relationType: 'TRIGGER', operator: '>' }
+      });
+      setIsEditingConstraint(true);
+      setNewConstraintText('');
+  };
+
+  const handleStartEditConstraint = (item: ConstraintItem) => {
+      setEditMode('edit');
+      // Ensure logic object exists
+      setCurrentConstraint({
+          ...item,
+          logic: item.logic || { relationType: 'TRIGGER', operator: '>' }
+      });
+      setIsEditingConstraint(true);
+  };
+
   const handleAnalyzeClick = async () => {
       if (!newConstraintText.trim()) return;
       setAnalyzingConstraint(true);
       try {
           const result = await onAnalyzeConstraint(newConstraintText);
-          setParsedConstraint(result);
+          setCurrentConstraint(prev => ({
+              ...prev,
+              label: result.label || prev.label,
+              description: result.description || prev.description,
+              impactLevel: result.impactLevel as any || prev.impactLevel,
+              formula: result.formula,
+              // Simple heuristic to map formula to logic struct if possible, otherwise keep defaults
+              logic: {
+                  ...prev.logic!,
+                  actionDescription: result.formula // Store basic formula in action for now
+              }
+          }));
       } finally {
           setAnalyzingConstraint(false);
       }
   };
 
   const handleSaveConstraint = () => {
-      if (!parsedConstraint || !parsedConstraint.label) return;
-      const newItem: ConstraintItem = {
-          id: `custom-${Date.now()}`,
-          label: parsedConstraint.label || 'New Rule',
-          description: parsedConstraint.description || '',
-          enabled: true,
-          impactLevel: parsedConstraint.impactLevel as any || 'medium',
-          formula: parsedConstraint.formula
-      };
-      onAddConstraint(newItem);
-      setIsCreatingConstraint(false);
-      setNewConstraintText('');
-      setParsedConstraint(null);
+      if (!currentConstraint.label) return;
+      onAddConstraint(currentConstraint);
+      setIsEditingConstraint(false);
+  };
+
+  const updateLogic = (field: keyof ConstraintLogic, value: any) => {
+      setCurrentConstraint(prev => ({
+          ...prev,
+          logic: { ...prev.logic!, [field]: value }
+      }));
   };
 
   return (
@@ -140,142 +188,237 @@ const ConstraintPanel: React.FC<Props> = ({
             onClick={() => setActiveTab('constraints')}
         >
             <Sliders size={16} />
-            约束配置
+            本体配置
         </button>
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-6">
         {activeTab === 'constraints' ? (
            <>
-              {!isCreatingConstraint ? (
-                  <button 
-                    onClick={() => setIsCreatingConstraint(true)}
-                    className="w-full py-2 border-2 border-dashed border-blue-200 text-blue-600 rounded-lg hover:bg-blue-50 hover:border-blue-400 transition-all flex items-center justify-center gap-2 font-semibold text-sm"
-                  >
-                    <Plus size={16} />
-                    新增约束条件
-                  </button>
+              {!isEditingConstraint ? (
+                  <>
+                    <button 
+                        onClick={handleStartCreateConstraint}
+                        className="w-full py-2 border-2 border-dashed border-blue-200 text-blue-600 rounded-lg hover:bg-blue-50 hover:border-blue-400 transition-all flex items-center justify-center gap-2 font-semibold text-sm"
+                    >
+                        <Plus size={16} />
+                        新增规则对象
+                    </button>
+
+                    {constraints.map((category) => (
+                        <div key={category.id} className="space-y-3">
+                        <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+                            {category.name}
+                        </h3>
+                        <div className="space-y-3">
+                            {category.items.map((item) => (
+                            <div key={item.id} className="group bg-slate-50 rounded-lg p-3 border border-slate-100 hover:border-slate-300 transition-colors">
+                                <div className="flex justify-between items-start mb-1">
+                                    <div className="flex items-center gap-2">
+                                        <button 
+                                            onClick={() => handleStartEditConstraint(item)}
+                                            className="text-slate-400 hover:text-blue-600 transition-colors"
+                                        >
+                                            <Edit2 size={14} />
+                                        </button>
+                                        <label className="text-sm font-semibold text-slate-700 cursor-pointer select-none">
+                                            {item.label}
+                                        </label>
+                                    </div>
+                                <div className="relative inline-block w-10 mr-2 align-middle select-none transition duration-200 ease-in">
+                                    <input 
+                                    type="checkbox" 
+                                    checked={item.enabled}
+                                    onChange={() => onToggleConstraint(category.id, item.id)}
+                                    className="toggle-checkbox absolute block w-5 h-5 rounded-full bg-white border-4 appearance-none cursor-pointer checked:right-0 right-5 transition-all duration-200"
+                                    style={{ top: '2px', borderColor: item.enabled ? '#3b82f6' : '#cbd5e1' }}
+                                    />
+                                    <div className={`block overflow-hidden h-6 rounded-full cursor-pointer transition-colors duration-200 ${item.enabled ? 'bg-blue-600' : 'bg-slate-300'}`}></div>
+                                </div>
+                                </div>
+                                <p className="text-xs text-slate-500 leading-relaxed mb-2">
+                                {item.description}
+                                </p>
+                                {/* Mini Ontology Visualization */}
+                                {item.logic && (
+                                    <div className="flex items-center gap-1 text-[10px] text-slate-500 bg-white border border-slate-200 rounded p-1.5 w-fit">
+                                        <span className="font-mono text-blue-600">{item.logic.relationType}</span>
+                                        <ArrowDown size={10} className="-rotate-90 text-slate-300"/>
+                                        <span>{item.logic.attribute || 'Event'}</span>
+                                    </div>
+                                )}
+                            </div>
+                            ))}
+                        </div>
+                        </div>
+                    ))}
+                  </>
               ) : (
                   <div className="bg-white border border-slate-200 rounded-lg shadow-sm p-4 space-y-4 animate-in fade-in slide-in-from-top-2">
-                      <div className="flex justify-between items-center">
-                          <h3 className="text-xs font-bold text-slate-800 uppercase">定义新规则</h3>
-                          <button onClick={() => setIsCreatingConstraint(false)} className="text-slate-400 hover:text-slate-600">
+                      <div className="flex justify-between items-center pb-2 border-b border-slate-100">
+                          <h3 className="text-xs font-bold text-slate-800 uppercase flex items-center gap-2">
+                              {editMode === 'create' ? <Plus size={14}/> : <Edit2 size={14}/>}
+                              {editMode === 'create' ? '新建规则对象' : '编辑规则配置'}
+                          </h3>
+                          <button onClick={() => setIsEditingConstraint(false)} className="text-slate-400 hover:text-slate-600">
                               <X size={16} />
                           </button>
                       </div>
-                      
-                      {!parsedConstraint ? (
-                          <>
-                             <textarea 
-                                className="w-full h-24 p-3 bg-slate-50 border border-slate-200 rounded-md text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none resize-none"
-                                placeholder="请输入自然语言描述，例如：'如果宁德基地的库存低于2000，则触发紧急补货报警'"
+
+                      {/* AI Helper for Create Mode */}
+                      {editMode === 'create' && (
+                          <div className="bg-slate-50 p-2 rounded border border-slate-100 space-y-2">
+                               <textarea 
+                                className="w-full h-16 p-2 bg-white border border-slate-200 rounded text-xs focus:ring-1 focus:ring-blue-500 outline-none resize-none"
+                                placeholder="输入自然语言描述 (e.g., '如果库存 < 2000, 触发报警')"
                                 value={newConstraintText}
                                 onChange={(e) => setNewConstraintText(e.target.value)}
                              />
                              <button 
                                 onClick={handleAnalyzeClick}
                                 disabled={analyzingConstraint || !newConstraintText.trim()}
-                                className="w-full bg-indigo-600 text-white py-2 rounded text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 flex items-center justify-center gap-2"
+                                className="w-full bg-white border border-indigo-200 text-indigo-600 py-1.5 rounded text-xs font-bold hover:bg-indigo-50 flex items-center justify-center gap-2"
                              >
-                                {analyzingConstraint ? <span className="animate-spin">⌛</span> : <Sparkles size={14} />}
-                                智能解析生成
+                                {analyzingConstraint ? <span className="animate-spin">⌛</span> : <Sparkles size={12} />}
+                                AI 填充表单
                              </button>
-                          </>
-                      ) : (
-                          <div className="space-y-3">
-                              {/* ... (Existing parsing result UI) ... */}
-                              <div>
-                                  <label className="text-xs font-semibold text-slate-500 block mb-1">规则名称</label>
-                                  <input 
-                                    type="text" 
-                                    value={parsedConstraint.label} 
-                                    onChange={(e) => setParsedConstraint({...parsedConstraint, label: e.target.value})}
-                                    className="w-full text-sm p-2 bg-slate-50 border rounded"
-                                  />
-                              </div>
-                              <div>
-                                  <label className="text-xs font-semibold text-slate-500 block mb-1">公式/逻辑</label>
-                                  <div className="font-mono text-xs bg-slate-900 text-green-400 p-2 rounded">
-                                      <input 
-                                        type="text" 
-                                        value={parsedConstraint.formula} 
-                                        onChange={(e) => setParsedConstraint({...parsedConstraint, formula: e.target.value})}
-                                        className="w-full bg-transparent border-none outline-none font-mono text-green-400 p-0"
-                                      />
-                                  </div>
-                              </div>
-                              <div>
-                                  <label className="text-xs font-semibold text-slate-500 block mb-1">影响等级</label>
-                                  <div className="flex gap-2">
-                                      {['low', 'medium', 'high'].map(level => (
-                                          <button 
-                                            key={level}
-                                            onClick={() => setParsedConstraint({...parsedConstraint, impactLevel: level as any})}
-                                            className={`flex-1 py-1 text-xs uppercase font-bold rounded border ${parsedConstraint.impactLevel === level 
-                                                ? (level === 'high' ? 'bg-red-100 text-red-700 border-red-200' : level === 'medium' ? 'bg-amber-100 text-amber-700 border-amber-200' : 'bg-green-100 text-green-700 border-green-200')
-                                                : 'bg-white text-slate-400 border-slate-200'}`}
-                                          >
-                                              {level}
-                                          </button>
-                                      ))}
-                                  </div>
-                              </div>
-                              <button 
-                                onClick={handleSaveConstraint}
-                                className="w-full bg-blue-600 text-white py-2 rounded text-sm font-medium hover:bg-blue-700 flex items-center justify-center gap-2 mt-2"
-                              >
-                                <Save size={14} />
-                                确认添加
-                              </button>
                           </div>
                       )}
+                      
+                      {/* === Ontology/Workflow Builder === */}
+                      <div className="space-y-0 relative">
+                          {/* Step 1: Trigger/Source */}
+                          <div className="relative z-10 bg-slate-50 border border-slate-200 rounded-lg p-3 space-y-2">
+                                <div className="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase">
+                                    <GitCommit size={12} className="text-blue-500"/> 触发对象 (Subject)
+                                </div>
+                                <select 
+                                    className="w-full text-xs border border-slate-300 rounded p-1.5 bg-white"
+                                    value={currentConstraint.logic?.sourceNodeId || ''}
+                                    onChange={(e) => updateLogic('sourceNodeId', e.target.value)}
+                                >
+                                    <option value="">(任意节点 / 全局)</option>
+                                    {nodes.map(n => <option key={n.id} value={n.id}>{n.name}</option>)}
+                                </select>
+                                <div className="flex gap-2">
+                                    <select 
+                                        className="flex-1 text-xs border border-slate-300 rounded p-1.5 bg-white"
+                                        value={currentConstraint.logic?.attribute || ''}
+                                        onChange={(e) => updateLogic('attribute', e.target.value)}
+                                    >
+                                        <option value="">选择属性...</option>
+                                        <option value="inventoryLevel">库存水平</option>
+                                        <option value="capacityUtilization">产能利用率</option>
+                                        <option value="onTimeRate">交付及时率</option>
+                                        <option value="activeAlerts">报警数量</option>
+                                    </select>
+                                    <select 
+                                        className="w-16 text-xs border border-slate-300 rounded p-1.5 bg-white text-center font-mono"
+                                        value={currentConstraint.logic?.operator || '>'}
+                                        onChange={(e) => updateLogic('operator', e.target.value)}
+                                    >
+                                        <option value=">">&gt;</option>
+                                        <option value="<">&lt;</option>
+                                        <option value="=">=</option>
+                                        <option value="CHANGE">Δ</option>
+                                    </select>
+                                    <input 
+                                        type="text"
+                                        className="w-16 text-xs border border-slate-300 rounded p-1.5 text-center"
+                                        placeholder="Value"
+                                        value={currentConstraint.logic?.value || ''}
+                                        onChange={(e) => updateLogic('value', e.target.value)}
+                                    />
+                                </div>
+                          </div>
+
+                          {/* Connector Arrow */}
+                          <div className="h-6 flex justify-center items-center -my-1 relative z-0">
+                                <div className="h-full w-0.5 bg-slate-300"></div>
+                                <div className="absolute bg-white p-1 rounded-full border border-slate-200">
+                                     <ArrowDown size={12} className="text-slate-400"/>
+                                </div>
+                          </div>
+
+                          {/* Step 2: Relation Logic */}
+                          <div className="relative z-10 bg-white border-2 border-indigo-100 rounded-lg p-3 space-y-2">
+                                <div className="flex items-center gap-2 text-xs font-bold text-indigo-500 uppercase">
+                                    <LinkIcon size={12}/> 逻辑关系 (Predicate)
+                                </div>
+                                <div className="flex gap-1 bg-slate-100 p-1 rounded">
+                                    {(['IMPACT', 'TRIGGER', 'QUERY'] as ConstraintRelationType[]).map(t => (
+                                        <button
+                                            key={t}
+                                            onClick={() => updateLogic('relationType', t)}
+                                            className={`flex-1 text-[10px] py-1 rounded font-bold transition-colors ${currentConstraint.logic?.relationType === t ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-200'}`}
+                                        >
+                                            {t}
+                                        </button>
+                                    ))}
+                                </div>
+                          </div>
+
+                           {/* Connector Arrow */}
+                           <div className="h-6 flex justify-center items-center -my-1 relative z-0">
+                                <div className="h-full w-0.5 bg-slate-300"></div>
+                                <div className="absolute bg-white p-1 rounded-full border border-slate-200">
+                                     <ArrowDown size={12} className="text-slate-400"/>
+                                </div>
+                          </div>
+
+                          {/* Step 3: Target/Effect */}
+                          <div className="relative z-10 bg-slate-50 border border-slate-200 rounded-lg p-3 space-y-2">
+                                <div className="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase">
+                                    <DbIcon size={12} className="text-emerald-500"/> 影响对象/动作 (Object)
+                                </div>
+                                 <select 
+                                    className="w-full text-xs border border-slate-300 rounded p-1.5 bg-white"
+                                    value={currentConstraint.logic?.targetNodeId || ''}
+                                    onChange={(e) => updateLogic('targetNodeId', e.target.value)}
+                                >
+                                    <option value="">(关联下游 / 自身)</option>
+                                    {nodes.map(n => <option key={n.id} value={n.id}>{n.name}</option>)}
+                                </select>
+                                <input 
+                                    type="text" 
+                                    placeholder="执行动作描述 (e.g. 'Lock Orders')"
+                                    className="w-full text-xs border border-slate-300 rounded p-1.5"
+                                    value={currentConstraint.logic?.actionDescription || ''}
+                                    onChange={(e) => updateLogic('actionDescription', e.target.value)}
+                                />
+                          </div>
+                      </div>
+
+                      {/* General Info */}
+                      <div className="pt-2 border-t border-slate-100 space-y-2">
+                          <div>
+                                <label className="text-xs font-semibold text-slate-500 block mb-1">规则名称</label>
+                                <input 
+                                type="text" 
+                                value={currentConstraint.label} 
+                                onChange={(e) => setCurrentConstraint({...currentConstraint, label: e.target.value})}
+                                className="w-full text-sm p-2 bg-slate-50 border rounded"
+                                />
+                            </div>
+                            <div>
+                                <label className="text-xs font-semibold text-slate-500 block mb-1">业务含义</label>
+                                <textarea 
+                                value={currentConstraint.description} 
+                                onChange={(e) => setCurrentConstraint({...currentConstraint, description: e.target.value})}
+                                className="w-full text-xs p-2 bg-slate-50 border rounded h-12 resize-none"
+                                />
+                            </div>
+                      </div>
+
+                      <button 
+                        onClick={handleSaveConstraint}
+                        className="w-full bg-blue-600 text-white py-2 rounded text-sm font-medium hover:bg-blue-700 flex items-center justify-center gap-2 mt-2"
+                      >
+                        <Save size={14} />
+                        {editMode === 'create' ? '创建新规则' : '保存修改'}
+                      </button>
                   </div>
               )}
-
-              {constraints.map((category) => (
-                <div key={category.id} className="space-y-3">
-                  <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
-                    {category.name}
-                  </h3>
-                  <div className="space-y-3">
-                    {category.items.map((item) => (
-                      <div key={item.id} className="group bg-slate-50 rounded-lg p-3 border border-slate-100 hover:border-slate-300 transition-colors">
-                        <div className="flex justify-between items-start mb-1">
-                          <label className="text-sm font-semibold text-slate-700 cursor-pointer select-none" htmlFor={item.id}>
-                            {item.label}
-                          </label>
-                           <div className="relative inline-block w-10 mr-2 align-middle select-none transition duration-200 ease-in">
-                            <input 
-                              type="checkbox" 
-                              name={item.id} 
-                              id={item.id} 
-                              checked={item.enabled}
-                              onChange={() => onToggleConstraint(category.id, item.id)}
-                              className="toggle-checkbox absolute block w-5 h-5 rounded-full bg-white border-4 appearance-none cursor-pointer checked:right-0 right-5 transition-all duration-200"
-                              style={{ top: '2px', borderColor: item.enabled ? '#3b82f6' : '#cbd5e1' }}
-                            />
-                            <label 
-                              htmlFor={item.id} 
-                              className={`toggle-label block overflow-hidden h-6 rounded-full cursor-pointer transition-colors duration-200 ${item.enabled ? 'bg-blue-600' : 'bg-slate-300'}`}
-                            ></label>
-                          </div>
-                        </div>
-                        <p className="text-xs text-slate-500 leading-relaxed">
-                          {item.description}
-                        </p>
-                         {item.formula && (
-                           <div className="mt-2 pt-2 border-t border-slate-200/50">
-                               <div className="flex items-center gap-1.5 text-[10px] text-slate-400 font-mono bg-slate-100 px-2 py-1 rounded w-fit">
-                                    <Activity size={10} />
-                                    {item.formula}
-                               </div>
-                           </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
            </>
         ) : (
           <div className="space-y-4">
