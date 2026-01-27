@@ -9,7 +9,7 @@ import InventoryPanel from './components/InventoryPanel';
 import SalesPanel from './components/SalesPanel';
 import ProductionMonitorPanel from './components/ProductionMonitorPanel';
 import Tooltip from './components/Tooltip';
-import AnomalyAnalysisModal from './components/AnomalyAnalysisModal';
+import { AnomalyAnalysisModal } from './components/AnomalyAnalysisModal';
 import { MOCK_DATA, INITIAL_CONSTRAINTS } from './constants';
 import { GraphData, NodeData, ConstraintCategory, ScenarioConfig, ChatMessage, ConstraintItem } from './types';
 
@@ -320,7 +320,11 @@ function App() {
 
   const handleSelectAllRisks = () => {
       const riskyNodes = graphData.nodes.filter(n => n.status === 'warning' || n.status === 'critical');
-      setSelectedNodes(riskyNodes);
+      if (riskyNodes.length > 0) {
+        setSelectedNodes(riskyNodes);
+        // Automatically open the modal for batch simulation
+        setIsAnalysisModalOpen(true);
+      }
   };
 
   const onTooltipEnter = useCallback(() => {
@@ -350,7 +354,7 @@ function App() {
             <Share2 size={20} />
           </div>
           <div>
-            <h1 className="font-bold text-slate-800 text-lg leading-tight">CALB产销智能推演系统</h1>
+            <h1 className="font-bold text-slate-800 text-lg leading-tight">产销智能推演系统</h1>
             <p className="text-xs text-slate-500 font-medium">Scenario: 2024-Q4-Optimized-v2</p>
           </div>
         </div>

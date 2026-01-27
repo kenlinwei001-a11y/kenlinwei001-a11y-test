@@ -199,7 +199,7 @@ const InventoryPanel: React.FC = () => {
                 </div>
             </div>
             <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
-                 <div className="text-xs text-slate-500 mb-1">呆滞库存占比 (>90天)</div>
+                 <div className="text-xs text-slate-500 mb-1">呆滞库存占比 ({'>'}90天)</div>
                  <div className="text-2xl font-bold text-red-600">5.2%</div>
                  <div className="flex items-center gap-1 text-[10px] text-slate-400 mt-1">
                     <AlertCircle size={10}/> 需关注江门基地

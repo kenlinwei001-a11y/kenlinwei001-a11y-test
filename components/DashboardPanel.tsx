@@ -96,7 +96,7 @@ const DashboardPanel: React.FC<Props> = ({ data }) => {
                   </div>
                   {data.isHighDeviation && (
                       <div className="text-[10px] text-red-500 mt-1 flex items-center gap-1">
-                          <AlertTriangle size={10}/> 偏差过大 (>20%)
+                          <AlertTriangle size={10}/> 偏差过大 ({'>'}20%)
                       </div>
                   )}
               </div>
@@ -239,7 +239,7 @@ const DashboardPanel: React.FC<Props> = ({ data }) => {
                 <div className="flex justify-end gap-3 mt-2 text-[9px] text-slate-400">
                      <div className="flex items-center gap-1"><div className="w-2 h-2 bg-slate-300 rounded-sm"></div>预测</div>
                      <div className="flex items-center gap-1"><div className="w-2 h-2 bg-blue-500 rounded-sm"></div>正常订单</div>
-                     <div className="flex items-center gap-1"><div className="w-2 h-2 bg-red-500 rounded-sm"></div>偏差>20%</div>
+                     <div className="flex items-center gap-1"><div className="w-2 h-2 bg-red-500 rounded-sm"></div>偏差{'>'}20%</div>
                 </div>
             </div>
 

@@ -31,7 +31,7 @@ interface EmergencyPlan {
   };
 }
 
-const AnomalyAnalysisModal: React.FC<Props> = ({ nodes, graph, onClose, onAddConstraint }) => {
+export const AnomalyAnalysisModal: React.FC<Props> = ({ nodes, graph, onClose, onAddConstraint }) => {
   const [currentView, setCurrentView] = useState<'analysis' | 'planning'>('analysis');
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedPlans, setGeneratedPlans] = useState<EmergencyPlan[]>([]);
@@ -269,7 +269,7 @@ const AnomalyAnalysisModal: React.FC<Props> = ({ nodes, graph, onClose, onAddCon
                             {nodes.length} 个异常节点
                         </span>
                         <span>|</span>
-                        <span>推演模型: <span className="text-blue-600 font-bold">CALB-Macro-Sim-v2</span></span>
+                        <span>推演模型: <span className="text-blue-600 font-bold">Macro-Sim-v2</span></span>
                     </div>
                 </div>
             </div>
@@ -676,5 +676,3 @@ const AnomalyAnalysisModal: React.FC<Props> = ({ nodes, graph, onClose, onAddCon
     </div>
   );
 };
-
-export default AnomalyAnalysisModal;
