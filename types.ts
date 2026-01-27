@@ -141,6 +141,15 @@ export interface LLMConfig {
   modelName?: string; // e.g. 'moonshot-v1-8k'
 }
 
+// Theme Configuration
+export interface ThemeConfig {
+  heroColor: string;
+  operationsColor: string;
+  productionColor: string;
+  inventoryColor: string;
+  salesColor: string;
+}
+
 // Connector Types
 export type DataSourceType = 'SAP' | 'MES' | 'CRM' | 'IOT' | 'WMS' | 'SQL';
 

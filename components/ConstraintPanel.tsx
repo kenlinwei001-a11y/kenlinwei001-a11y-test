@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { ConstraintCategory, ConstraintItem, NodeData, NodeType, ScenarioConfig, ConstraintLogic, ConstraintRelationType } from '../types';
 import { Settings, Sliders, Activity, Zap, Search, Plus, Save, X, Sparkles, Trash2, List, Edit2, ArrowDown, GitCommit, Database as DbIcon, Link as LinkIcon, AlertTriangle, BrainCircuit } from 'lucide-react';
@@ -186,56 +187,56 @@ const ConstraintPanel: React.FC<Props> = ({
     <div className="flex flex-col h-full bg-white w-full">
       <div className="flex border-b border-slate-200 sticky top-0 bg-white z-10">
         <button 
-            className={`flex-1 py-4 text-sm font-bold flex items-center justify-center gap-2 ${activeTab === 'scenarios' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/50' : 'text-slate-500 hover:text-slate-700'}`}
+            className={`flex-1 py-4 text-base font-bold flex items-center justify-center gap-2 ${activeTab === 'scenarios' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/50' : 'text-slate-500 hover:text-slate-700'}`}
             onClick={() => setActiveTab('scenarios')}
         >
-            <Zap size={16} />
+            <Zap size={18} />
             场景模拟
         </button>
         <button 
-            className={`flex-1 py-4 text-sm font-bold flex items-center justify-center gap-2 ${activeTab === 'constraints' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/50' : 'text-slate-500 hover:text-slate-700'}`}
+            className={`flex-1 py-4 text-base font-bold flex items-center justify-center gap-2 ${activeTab === 'constraints' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/50' : 'text-slate-500 hover:text-slate-700'}`}
             onClick={() => setActiveTab('constraints')}
         >
-            <Sliders size={16} />
+            <Sliders size={18} />
             推演配置
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-6">
+      <div className="flex-1 overflow-y-auto p-5 space-y-6">
         {activeTab === 'constraints' ? (
            <>
               {!isEditingConstraint ? (
                   <>
                     <button 
                         onClick={handleStartCreateConstraint}
-                        className="w-full py-2 border-2 border-dashed border-blue-200 text-blue-600 rounded-lg hover:bg-blue-50 hover:border-blue-400 transition-all flex items-center justify-center gap-2 font-semibold text-sm"
+                        className="w-full py-2.5 border-2 border-dashed border-blue-200 text-blue-600 rounded-lg hover:bg-blue-50 hover:border-blue-400 transition-all flex items-center justify-center gap-2 font-semibold text-sm"
                     >
-                        <Plus size={16} />
+                        <Plus size={18} />
                         新增规则对象
                     </button>
 
                     {constraints.map((category) => (
                         <div key={category.id} className="space-y-3">
-                        <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+                        <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
                             {category.name}
                         </h3>
                         <div className="space-y-3">
                             {category.items.map((item) => (
-                            <div key={item.id} className={`group bg-slate-50 rounded-lg p-3 border transition-colors ${item.source === 'ai' ? 'border-purple-200 bg-purple-50/50' : 'border-slate-100 hover:border-slate-300'}`}>
-                                <div className="flex justify-between items-start mb-1">
+                            <div key={item.id} className={`group bg-slate-50 rounded-lg p-4 border transition-colors ${item.source === 'ai' ? 'border-purple-200 bg-purple-50/50' : 'border-slate-100 hover:border-slate-300'}`}>
+                                <div className="flex justify-between items-start mb-1.5">
                                     <div className="flex items-center gap-2">
                                         <button 
                                             onClick={() => handleStartEditConstraint(item)}
                                             className="text-slate-400 hover:text-blue-600 transition-colors"
                                         >
-                                            <Edit2 size={14} />
+                                            <Edit2 size={16} />
                                         </button>
-                                        <label className="text-sm font-semibold text-slate-700 cursor-pointer select-none">
+                                        <label className="text-base font-semibold text-slate-700 cursor-pointer select-none">
                                             {item.label}
                                         </label>
                                         {item.source === 'ai' && (
-                                            <span className="flex items-center gap-1 text-[9px] font-bold text-white bg-purple-500 px-1.5 py-0.5 rounded-full">
-                                                <BrainCircuit size={8} /> AI
+                                            <span className="flex items-center gap-1 text-[10px] font-bold text-white bg-purple-500 px-1.5 py-0.5 rounded-full">
+                                                <BrainCircuit size={10} /> AI
                                             </span>
                                         )}
                                     </div>
@@ -250,14 +251,14 @@ const ConstraintPanel: React.FC<Props> = ({
                                     <div className={`block overflow-hidden h-6 rounded-full cursor-pointer transition-colors duration-200 ${item.enabled ? 'bg-blue-600' : 'bg-slate-300'}`}></div>
                                 </div>
                                 </div>
-                                <p className="text-xs text-slate-500 leading-relaxed mb-2">
+                                <p className="text-sm text-slate-500 leading-relaxed mb-3">
                                 {item.description}
                                 </p>
                                 {/* Mini Ontology Visualization */}
                                 {item.logic && (
-                                    <div className="flex items-center gap-1 text-[10px] text-slate-500 bg-white border border-slate-200 rounded p-1.5 w-fit">
+                                    <div className="flex items-center gap-1.5 text-xs text-slate-500 bg-white border border-slate-200 rounded p-1.5 w-fit">
                                         <span className="font-mono text-blue-600">{item.logic.relationType}</span>
-                                        <ArrowDown size={10} className="-rotate-90 text-slate-300"/>
+                                        <ArrowDown size={12} className="-rotate-90 text-slate-300"/>
                                         <span>{item.logic.attribute || 'Event'}</span>
                                     </div>
                                 )}
@@ -268,22 +269,22 @@ const ConstraintPanel: React.FC<Props> = ({
                     ))}
                   </>
               ) : (
-                  <div className="bg-white border border-slate-200 rounded-lg shadow-sm p-4 space-y-4 animate-in fade-in slide-in-from-top-2">
+                  <div className="bg-white border border-slate-200 rounded-lg shadow-sm p-5 space-y-5 animate-in fade-in slide-in-from-top-2">
                       <div className="flex justify-between items-center pb-2 border-b border-slate-100">
-                          <h3 className="text-xs font-bold text-slate-800 uppercase flex items-center gap-2">
-                              {editMode === 'create' ? <Plus size={14}/> : <Edit2 size={14}/>}
+                          <h3 className="text-sm font-bold text-slate-800 uppercase flex items-center gap-2">
+                              {editMode === 'create' ? <Plus size={16}/> : <Edit2 size={16}/>}
                               {editMode === 'create' ? '新建规则对象' : '编辑规则配置'}
                           </h3>
                           <button onClick={() => setIsEditingConstraint(false)} className="text-slate-400 hover:text-slate-600">
-                              <X size={16} />
+                              <X size={18} />
                           </button>
                       </div>
 
                       {/* AI Helper for Create Mode */}
                       {editMode === 'create' && (
-                          <div className="bg-slate-50 p-2 rounded border border-slate-100 space-y-2">
+                          <div className="bg-slate-50 p-3 rounded border border-slate-100 space-y-3">
                                <textarea 
-                                className="w-full h-16 p-2 bg-white border border-slate-200 rounded text-xs focus:ring-1 focus:ring-blue-500 outline-none resize-none"
+                                className="w-full h-20 p-2.5 bg-white border border-slate-200 rounded text-sm focus:ring-1 focus:ring-blue-500 outline-none resize-none"
                                 placeholder="输入自然语言描述 (e.g., '如果库存 < 2000, 触发报警')"
                                 value={newConstraintText}
                                 onChange={(e) => setNewConstraintText(e.target.value)}
@@ -291,9 +292,9 @@ const ConstraintPanel: React.FC<Props> = ({
                              <button 
                                 onClick={handleAnalyzeClick}
                                 disabled={analyzingConstraint || !newConstraintText.trim()}
-                                className="w-full bg-white border border-indigo-200 text-indigo-600 py-1.5 rounded text-xs font-bold hover:bg-indigo-50 flex items-center justify-center gap-2"
+                                className="w-full bg-white border border-indigo-200 text-indigo-600 py-2 rounded text-xs font-bold hover:bg-indigo-50 flex items-center justify-center gap-2"
                              >
-                                {analyzingConstraint ? <span className="animate-spin">⌛</span> : <Sparkles size={12} />}
+                                {analyzingConstraint ? <span className="animate-spin">⌛</span> : <Sparkles size={14} />}
                                 AI 填充表单
                              </button>
                           </div>
@@ -302,12 +303,12 @@ const ConstraintPanel: React.FC<Props> = ({
                       {/* === Ontology/Workflow Builder === */}
                       <div className="space-y-0 relative">
                           {/* Step 1: Trigger/Source */}
-                          <div className="relative z-10 bg-slate-50 border border-slate-200 rounded-lg p-3 space-y-2">
+                          <div className="relative z-10 bg-slate-50 border border-slate-200 rounded-lg p-3 space-y-3">
                                 <div className="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase">
-                                    <GitCommit size={12} className="text-blue-500"/> 触发对象 (Subject)
+                                    <GitCommit size={14} className="text-blue-500"/> 触发对象 (Subject)
                                 </div>
                                 <select 
-                                    className="w-full text-xs border border-slate-300 rounded p-1.5 bg-white"
+                                    className="w-full text-sm border border-slate-300 rounded p-2 bg-white"
                                     value={currentConstraint.logic?.sourceNodeId || ''}
                                     onChange={(e) => updateLogic('sourceNodeId', e.target.value)}
                                 >
@@ -316,7 +317,7 @@ const ConstraintPanel: React.FC<Props> = ({
                                 </select>
                                 <div className="flex gap-2">
                                     <select 
-                                        className="flex-1 text-xs border border-slate-300 rounded p-1.5 bg-white"
+                                        className="flex-1 text-sm border border-slate-300 rounded p-2 bg-white"
                                         value={currentConstraint.logic?.attribute || ''}
                                         onChange={(e) => updateLogic('attribute', e.target.value)}
                                     >
@@ -327,7 +328,7 @@ const ConstraintPanel: React.FC<Props> = ({
                                         <option value="activeAlerts">报警数量</option>
                                     </select>
                                     <select 
-                                        className="w-16 text-xs border border-slate-300 rounded p-1.5 bg-white text-center font-mono"
+                                        className="w-16 text-sm border border-slate-300 rounded p-2 bg-white text-center font-mono"
                                         value={currentConstraint.logic?.operator || '>'}
                                         onChange={(e) => updateLogic('operator', e.target.value)}
                                     >
@@ -338,7 +339,7 @@ const ConstraintPanel: React.FC<Props> = ({
                                     </select>
                                     <input 
                                         type="text"
-                                        className="w-16 text-xs border border-slate-300 rounded p-1.5 text-center"
+                                        className="w-20 text-sm border border-slate-300 rounded p-2 text-center"
                                         placeholder="Value"
                                         value={currentConstraint.logic?.value || ''}
                                         onChange={(e) => updateLogic('value', e.target.value)}
@@ -347,24 +348,24 @@ const ConstraintPanel: React.FC<Props> = ({
                           </div>
 
                           {/* Connector Arrow */}
-                          <div className="h-6 flex justify-center items-center -my-1 relative z-0">
+                          <div className="h-8 flex justify-center items-center -my-1 relative z-0">
                                 <div className="h-full w-0.5 bg-slate-300"></div>
                                 <div className="absolute bg-white p-1 rounded-full border border-slate-200">
-                                     <ArrowDown size={12} className="text-slate-400"/>
+                                     <ArrowDown size={14} className="text-slate-400"/>
                                 </div>
                           </div>
 
                           {/* Step 2: Relation Logic */}
-                          <div className="relative z-10 bg-white border-2 border-indigo-100 rounded-lg p-3 space-y-2">
+                          <div className="relative z-10 bg-white border-2 border-indigo-100 rounded-lg p-3 space-y-3">
                                 <div className="flex items-center gap-2 text-xs font-bold text-indigo-500 uppercase">
-                                    <LinkIcon size={12}/> 逻辑关系 (Predicate)
+                                    <LinkIcon size={14}/> 逻辑关系 (Predicate)
                                 </div>
                                 <div className="flex gap-1 bg-slate-100 p-1 rounded">
                                     {(['IMPACT', 'TRIGGER', 'QUERY'] as ConstraintRelationType[]).map(t => (
                                         <button
                                             key={t}
                                             onClick={() => updateLogic('relationType', t)}
-                                            className={`flex-1 text-[10px] py-1 rounded font-bold transition-colors ${currentConstraint.logic?.relationType === t ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-200'}`}
+                                            className={`flex-1 text-xs py-1.5 rounded font-bold transition-colors ${currentConstraint.logic?.relationType === t ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-200'}`}
                                         >
                                             {t}
                                         </button>
@@ -373,20 +374,20 @@ const ConstraintPanel: React.FC<Props> = ({
                           </div>
 
                            {/* Connector Arrow */}
-                           <div className="h-6 flex justify-center items-center -my-1 relative z-0">
+                           <div className="h-8 flex justify-center items-center -my-1 relative z-0">
                                 <div className="h-full w-0.5 bg-slate-300"></div>
                                 <div className="absolute bg-white p-1 rounded-full border border-slate-200">
-                                     <ArrowDown size={12} className="text-slate-400"/>
+                                     <ArrowDown size={14} className="text-slate-400"/>
                                 </div>
                           </div>
 
                           {/* Step 3: Target/Effect */}
-                          <div className="relative z-10 bg-slate-50 border border-slate-200 rounded-lg p-3 space-y-2">
+                          <div className="relative z-10 bg-slate-50 border border-slate-200 rounded-lg p-3 space-y-3">
                                 <div className="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase">
-                                    <DbIcon size={12} className="text-emerald-500"/> 影响对象/动作 (Object)
+                                    <DbIcon size={14} className="text-emerald-500"/> 影响对象/动作 (Object)
                                 </div>
                                  <select 
-                                    className="w-full text-xs border border-slate-300 rounded p-1.5 bg-white"
+                                    className="w-full text-sm border border-slate-300 rounded p-2 bg-white"
                                     value={currentConstraint.logic?.targetNodeId || ''}
                                     onChange={(e) => updateLogic('targetNodeId', e.target.value)}
                                 >
@@ -410,7 +411,7 @@ const ConstraintPanel: React.FC<Props> = ({
                                 <input 
                                     type="text" 
                                     placeholder="执行动作描述 (e.g. 'Lock Orders')"
-                                    className="w-full text-xs border border-slate-300 rounded p-1.5"
+                                    className="w-full text-sm border border-slate-300 rounded p-2"
                                     value={currentConstraint.logic?.actionDescription || ''}
                                     onChange={(e) => updateLogic('actionDescription', e.target.value)}
                                 />
@@ -418,7 +419,7 @@ const ConstraintPanel: React.FC<Props> = ({
                       </div>
 
                       {/* General Info */}
-                      <div className="pt-2 border-t border-slate-100 space-y-2">
+                      <div className="pt-3 border-t border-slate-100 space-y-3">
                           <div>
                                 <label className="text-xs font-semibold text-slate-500 block mb-1">规则名称</label>
                                 <input 
@@ -433,59 +434,59 @@ const ConstraintPanel: React.FC<Props> = ({
                                 <textarea 
                                 value={currentConstraint.description} 
                                 onChange={(e) => setCurrentConstraint({...currentConstraint, description: e.target.value})}
-                                className="w-full text-xs p-2 bg-slate-50 border rounded h-12 resize-none"
+                                className="w-full text-sm p-2 bg-slate-50 border rounded h-16 resize-none"
                                 />
                             </div>
                       </div>
 
                       <button 
                         onClick={handleSaveConstraint}
-                        className="w-full bg-blue-600 text-white py-2 rounded text-sm font-medium hover:bg-blue-700 flex items-center justify-center gap-2 mt-2"
+                        className="w-full bg-blue-600 text-white py-2.5 rounded-lg text-sm font-medium hover:bg-blue-700 flex items-center justify-center gap-2 mt-2"
                       >
-                        <Save size={14} />
+                        <Save size={16} />
                         {editMode === 'create' ? '创建新规则' : '保存修改'}
                       </button>
                   </div>
               )}
            </>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-5">
              {/* Pending Scenarios List */}
              {pendingScenarios.length > 0 && (
                 <div className="mb-4">
-                    <h3 className="text-xs font-bold text-slate-500 uppercase mb-2 flex items-center gap-1">
-                        <List size={12}/> 待推演事件列表 ({pendingScenarios.length})
+                    <h3 className="text-sm font-bold text-slate-500 uppercase mb-3 flex items-center gap-1">
+                        <List size={16}/> 待推演事件列表 ({pendingScenarios.length})
                     </h3>
-                    <div className="space-y-2">
+                    <div className="space-y-3">
                         {pendingScenarios.map((sc) => (
-                            <div key={sc.id} className="bg-white border border-slate-200 rounded p-2 text-xs flex justify-between items-start shadow-sm">
+                            <div key={sc.id} className="bg-white border border-slate-200 rounded p-3 text-sm flex justify-between items-start shadow-sm">
                                 <div>
                                     <div className="font-bold text-slate-700">{sc.targetNodeName}</div>
-                                    <div className="text-slate-500">{sc.description}</div>
+                                    <div className="text-slate-500 text-xs mt-1">{sc.description}</div>
                                 </div>
                                 <button onClick={() => removeScenario(sc.id!)} className="text-slate-400 hover:text-red-500">
-                                    <Trash2 size={14} />
+                                    <Trash2 size={16} />
                                 </button>
                             </div>
                         ))}
                     </div>
-                    <div className="border-b border-slate-200 my-4"></div>
+                    <div className="border-b border-slate-200 my-5"></div>
                 </div>
              )}
 
-             <div className="p-3 bg-blue-50 border border-blue-100 rounded-lg text-xs text-blue-800 leading-relaxed">
-                <span className="font-bold flex items-center gap-1 mb-1"><Activity size={12}/> 多场景联合推演</span>
+             <div className="p-4 bg-blue-50 border border-blue-100 rounded-lg text-sm text-blue-800 leading-relaxed">
+                <span className="font-bold flex items-center gap-1 mb-1"><Activity size={16}/> 多场景联合推演</span>
                 您可以添加多个事件（如：上游延期 + 下游减产），系统将分析这些事件的叠加效应。
              </div>
 
              {/* Step 1: Select Event Type */}
              <div className="space-y-2">
                 <label className="text-xs font-bold text-slate-500 uppercase">1. 选择事件类型</label>
-                <div className="grid grid-cols-2 gap-2">
-                    <button onClick={() => setSelectedType('SUPPLY_DELAY')} className={`py-2 px-1 text-xs rounded border ${selectedType === 'SUPPLY_DELAY' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white'}`}>上游供货延期</button>
-                    <button onClick={() => setSelectedType('DEMAND_CHANGE')} className={`py-2 px-1 text-xs rounded border ${selectedType === 'DEMAND_CHANGE' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white'}`}>下游需求变更</button>
-                    <button onClick={() => setSelectedType('PRODUCTION_ISSUE')} className={`py-2 px-1 text-xs rounded border ${selectedType === 'PRODUCTION_ISSUE' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white'}`}>基地产线故障</button>
-                    <button onClick={() => setSelectedType('INVENTORY_ISSUE')} className={`py-2 px-1 text-xs rounded border ${selectedType === 'INVENTORY_ISSUE' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white'}`}>库存水位预警</button>
+                <div className="grid grid-cols-2 gap-3">
+                    <button onClick={() => setSelectedType('SUPPLY_DELAY')} className={`py-2.5 px-2 text-sm rounded border ${selectedType === 'SUPPLY_DELAY' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white'}`}>上游供货延期</button>
+                    <button onClick={() => setSelectedType('DEMAND_CHANGE')} className={`py-2.5 px-2 text-sm rounded border ${selectedType === 'DEMAND_CHANGE' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white'}`}>下游需求变更</button>
+                    <button onClick={() => setSelectedType('PRODUCTION_ISSUE')} className={`py-2.5 px-2 text-sm rounded border ${selectedType === 'PRODUCTION_ISSUE' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white'}`}>基地产线故障</button>
+                    <button onClick={() => setSelectedType('INVENTORY_ISSUE')} className={`py-2.5 px-2 text-sm rounded border ${selectedType === 'INVENTORY_ISSUE' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white'}`}>库存水位预警</button>
                 </div>
              </div>
 
@@ -496,52 +497,52 @@ const ConstraintPanel: React.FC<Props> = ({
                     <select 
                         value={selectedNodeId}
                         onChange={(e) => setSelectedNodeId(e.target.value)}
-                        className="w-full appearance-none bg-white border border-slate-200 text-slate-700 text-sm rounded-lg pl-3 pr-8 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-shadow cursor-pointer"
+                        className="w-full appearance-none bg-white border border-slate-200 text-slate-700 text-base rounded-lg pl-3 pr-10 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-shadow cursor-pointer"
                     >
                         <option value="" disabled>-- 请选择 --</option>
                         {targetNodes.map(n => (
                             <option key={n.id} value={n.id}>{n.name}</option>
                         ))}
                     </select>
-                    <Search className="absolute right-3 top-3 text-slate-400 pointer-events-none" size={16} />
+                    <Search className="absolute right-3 top-3.5 text-slate-400 pointer-events-none" size={18} />
                 </div>
              </div>
 
              {/* Step 3: Modify Parameters */}
              {selectedNode && (
-                 <div className="space-y-3 bg-slate-50 p-3 rounded border border-slate-200 animate-in fade-in slide-in-from-top-1">
-                    <div className="flex items-center gap-2 pb-1 border-b border-slate-100">
-                        <Settings size={14} className="text-slate-400" />
+                 <div className="space-y-4 bg-slate-50 p-4 rounded border border-slate-200 animate-in fade-in slide-in-from-top-1">
+                    <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
+                        <Settings size={16} className="text-slate-400" />
                         <label className="text-xs font-bold text-slate-500 uppercase">3. 设定参数</label>
                     </div>
 
                     {selectedType === 'SUPPLY_DELAY' && (
                         <>
-                            <div><label className="text-xs text-slate-600">延期天数</label><input type="number" value={formParams.delayDays || 0} onChange={(e) => setFormParams({...formParams, delayDays: e.target.value})} className="w-full border rounded p-1 text-sm"/></div>
+                            <div><label className="text-xs text-slate-600 block mb-1">延期天数</label><input type="number" value={formParams.delayDays || 0} onChange={(e) => setFormParams({...formParams, delayDays: e.target.value})} className="w-full border rounded p-2 text-sm"/></div>
                         </>
                     )}
                     {selectedType === 'DEMAND_CHANGE' && (
                         <>
-                            <div><label className="text-xs text-slate-600">需求波动 (%)</label><input type="number" value={formParams.demandChange || 0} onChange={(e) => setFormParams({...formParams, demandChange: e.target.value})} className="w-full border rounded p-1 text-sm"/></div>
+                            <div><label className="text-xs text-slate-600 block mb-1">需求波动 (%)</label><input type="number" value={formParams.demandChange || 0} onChange={(e) => setFormParams({...formParams, demandChange: e.target.value})} className="w-full border rounded p-2 text-sm"/></div>
                         </>
                     )}
                     {selectedType === 'PRODUCTION_ISSUE' && (
                         <>
-                            <div><label className="text-xs text-slate-600">停机天数</label><input type="number" value={formParams.downtimeDays || 0} onChange={(e) => setFormParams({...formParams, downtimeDays: e.target.value})} className="w-full border rounded p-1 text-sm"/></div>
-                            <div><label className="text-xs text-slate-600">效率损失 (%)</label><input type="number" value={formParams.efficiencyLoss || 0} onChange={(e) => setFormParams({...formParams, efficiencyLoss: e.target.value})} className="w-full border rounded p-1 text-sm"/></div>
+                            <div><label className="text-xs text-slate-600 block mb-1">停机天数</label><input type="number" value={formParams.downtimeDays || 0} onChange={(e) => setFormParams({...formParams, downtimeDays: e.target.value})} className="w-full border rounded p-2 text-sm"/></div>
+                            <div><label className="text-xs text-slate-600 block mb-1">效率损失 (%)</label><input type="number" value={formParams.efficiencyLoss || 0} onChange={(e) => setFormParams({...formParams, efficiencyLoss: e.target.value})} className="w-full border rounded p-2 text-sm"/></div>
                         </>
                     )}
                     {selectedType === 'INVENTORY_ISSUE' && (
                          <>
-                            <div><label className="text-xs text-slate-600">当前库存 (Ah)</label><input type="number" value={formParams.currentLevel || 0} onChange={(e) => setFormParams({...formParams, currentLevel: e.target.value})} className="w-full border rounded p-1 text-sm"/></div>
+                            <div><label className="text-xs text-slate-600 block mb-1">当前库存 (Ah)</label><input type="number" value={formParams.currentLevel || 0} onChange={(e) => setFormParams({...formParams, currentLevel: e.target.value})} className="w-full border rounded p-2 text-sm"/></div>
                          </>
                     )}
 
                     <button 
                         onClick={handleAddScenario}
-                        className="w-full mt-2 bg-indigo-100 text-indigo-700 hover:bg-indigo-200 py-2 rounded text-xs font-bold transition-colors flex items-center justify-center gap-1"
+                        className="w-full mt-2 bg-indigo-100 text-indigo-700 hover:bg-indigo-200 py-2.5 rounded text-sm font-bold transition-colors flex items-center justify-center gap-2"
                     >
-                        <Plus size={14} /> 添加到推演列表
+                        <Plus size={16} /> 添加到推演列表
                     </button>
                  </div>
              )}
@@ -549,28 +550,28 @@ const ConstraintPanel: React.FC<Props> = ({
         )}
       </div>
 
-      <div className="p-4 border-t border-slate-200 bg-slate-50 sticky bottom-0 z-10">
+      <div className="p-5 border-t border-slate-200 bg-slate-50 sticky bottom-0 z-10">
         {activeTab === 'scenarios' ? (
              <button 
                 onClick={handleRunJointSimulation}
                 disabled={pendingScenarios.length === 0 || isSimulating}
-                className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white text-sm font-semibold py-2.5 px-4 rounded shadow transition-all flex items-center justify-center gap-2"
+                className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white text-base font-semibold py-3 px-6 rounded-lg shadow transition-all flex items-center justify-center gap-2"
             >
                 {isSimulating ? (
                     <>
-                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
                         推演计算中...
                     </>
                 ) : (
                     <>
-                        <Zap size={16} fill="currentColor" />
+                        <Zap size={20} fill="currentColor" />
                         执行联合推演 ({pendingScenarios.length})
                     </>
                 )}
             </button>
         ) : (
-            <button className="w-full bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 text-sm font-semibold py-2.5 px-4 rounded shadow-sm transition-colors flex items-center justify-center gap-2">
-                <Save size={16} />
+            <button className="w-full bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 text-base font-semibold py-3 px-6 rounded-lg shadow-sm transition-colors flex items-center justify-center gap-2">
+                <Save size={20} />
                 保存配置更改
             </button>
         )}

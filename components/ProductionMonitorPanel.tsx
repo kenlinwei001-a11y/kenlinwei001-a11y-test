@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Factory, ChevronDown, ChevronRight, Activity, Zap, AlertTriangle, Settings } from 'lucide-react';
 
@@ -41,50 +42,50 @@ const ProductionMonitorPanel: React.FC = () => {
 
   return (
     <div className="flex flex-col h-full bg-slate-50/50 w-full">
-      <div className="p-5 border-b border-slate-200 bg-white sticky top-0 z-10">
-        <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-          <Factory className="text-indigo-600" size={20}/>
+      <div className="p-6 border-b border-slate-200 bg-white sticky top-0 z-10">
+        <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+          <Factory className="text-indigo-600" size={24}/>
           基地产线工序监控
         </h2>
-        <div className="flex justify-between items-end mt-1">
-             <p className="text-xs text-slate-500">MES Real-time Data Feed</p>
-             <span className="text-[10px] bg-slate-100 px-2 py-0.5 rounded text-slate-600 font-medium">覆盖 8 大基地 / 100+ 产线</span>
+        <div className="flex justify-between items-end mt-2">
+             <p className="text-sm text-slate-500">MES Real-time Data Feed</p>
+             <span className="text-xs bg-slate-100 px-3 py-1 rounded text-slate-600 font-medium">覆盖 8 大基地 / 100+ 产线</span>
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div className="flex-1 overflow-y-auto p-6 space-y-4">
         
         {bases.map((base, baseIdx) => (
             <div key={base.id} className="bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden">
                 <div 
-                    className="p-3 bg-slate-50 flex items-center justify-between cursor-pointer hover:bg-slate-100 transition-colors"
+                    className="p-4 bg-slate-50 flex items-center justify-between cursor-pointer hover:bg-slate-100 transition-colors"
                     onClick={() => toggleBase(base.id)}
                 >
-                    <div className="flex items-center gap-2">
-                        {expandedBases.includes(base.id) ? <ChevronDown size={16} className="text-slate-400"/> : <ChevronRight size={16} className="text-slate-400"/>}
+                    <div className="flex items-center gap-3">
+                        {expandedBases.includes(base.id) ? <ChevronDown size={18} className="text-slate-400"/> : <ChevronRight size={18} className="text-slate-400"/>}
                         <div>
-                            <span className="font-bold text-sm text-slate-700">{base.name}</span>
-                            <span className="ml-2 text-[10px] text-slate-400">产能: {base.capacity}</span>
+                            <span className="font-bold text-base text-slate-700">{base.name}</span>
+                            <span className="ml-3 text-xs text-slate-400">产能: {base.capacity}</span>
                         </div>
                     </div>
-                    <div className="flex items-center gap-3">
-                         <div className="flex items-center gap-1 text-[10px] text-slate-500">
-                             <Settings size={12}/> {base.lines} 条产线
+                    <div className="flex items-center gap-4">
+                         <div className="flex items-center gap-1 text-xs text-slate-500">
+                             <Settings size={14}/> {base.lines} 条产线
                          </div>
                          {base.status === 'normal' ? (
-                             <span className="flex items-center gap-1 text-[10px] text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded"><Activity size={10}/> 正常</span>
+                             <span className="flex items-center gap-1 text-xs text-emerald-600 font-bold bg-emerald-50 px-3 py-1 rounded"><Activity size={12}/> 正常</span>
                          ) : base.status === 'warning' ? (
-                             <span className="flex items-center gap-1 text-[10px] text-amber-600 font-bold bg-amber-50 px-2 py-0.5 rounded"><AlertTriangle size={10}/> 预警</span>
+                             <span className="flex items-center gap-1 text-xs text-amber-600 font-bold bg-amber-50 px-3 py-1 rounded"><AlertTriangle size={12}/> 预警</span>
                          ) : (
-                             <span className="flex items-center gap-1 text-[10px] text-red-600 font-bold bg-red-50 px-2 py-0.5 rounded"><AlertTriangle size={10}/> 异常</span>
+                             <span className="flex items-center gap-1 text-xs text-red-600 font-bold bg-red-50 px-3 py-1 rounded"><AlertTriangle size={12}/> 异常</span>
                          )}
                     </div>
                 </div>
 
                 {expandedBases.includes(base.id) && (
-                    <div className="p-3 border-t border-slate-100 space-y-3">
+                    <div className="p-4 border-t border-slate-100 space-y-3">
                         {/* Process Header */}
-                        <div className="flex pl-16 pr-2 gap-1 text-[9px] font-bold text-slate-400 uppercase text-center">
+                        <div className="flex pl-20 pr-3 gap-2 text-[11px] font-bold text-slate-400 uppercase text-center">
                             {processSteps.map(step => (
                                 <div key={step.id} className="flex-1">{step.name}</div>
                             ))}
@@ -92,9 +93,9 @@ const ProductionMonitorPanel: React.FC = () => {
 
                         {/* Lines Rows */}
                         {Array.from({length: base.lines}).map((_, lineIdx) => (
-                            <div key={lineIdx} className="flex items-center gap-2 text-xs">
-                                <div className="w-14 font-medium text-slate-600 shrink-0 text-right pr-2">Line {lineIdx + 1}</div>
-                                <div className="flex-1 flex gap-1 h-6">
+                            <div key={lineIdx} className="flex items-center gap-3 text-sm">
+                                <div className="w-16 font-medium text-slate-600 shrink-0 text-right pr-2">Line {lineIdx + 1}</div>
+                                <div className="flex-1 flex gap-2 h-8">
                                     {processSteps.map((step, stepIdx) => {
                                         const status = getStepStatus(baseIdx, lineIdx, stepIdx);
                                         const color = status === 'running' ? 'bg-emerald-400' :
@@ -104,15 +105,16 @@ const ProductionMonitorPanel: React.FC = () => {
                                         return (
                                             <div key={step.id} className={`flex-1 rounded-sm ${color} relative group cursor-pointer hover:opacity-80 transition-opacity`}>
                                                 {/* Tooltip on Hover */}
-                                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block bg-slate-800 text-white text-[9px] px-2 py-1 rounded whitespace-nowrap z-20">
-                                                    {step.name}: {status === 'running' ? 'Running' : status === 'error' ? 'Fault' : 'Idle'}
-                                                    <br/>OEE: {status === 'running' ? '98.2%' : '0%'}
+                                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block bg-slate-800 text-white text-xs px-3 py-2 rounded whitespace-nowrap z-20 shadow-lg">
+                                                    <div className="font-bold">{step.name}</div>
+                                                    <div>Status: {status === 'running' ? 'Running' : status === 'error' ? 'Fault' : 'Idle'}</div>
+                                                    <div>OEE: {status === 'running' ? '98.2%' : '0%'}</div>
                                                 </div>
                                             </div>
                                         );
                                     })}
                                 </div>
-                                <div className="w-8 text-center font-mono text-[10px] text-slate-400">92%</div>
+                                <div className="w-10 text-center font-mono text-xs text-slate-400">92%</div>
                             </div>
                         ))}
                     </div>

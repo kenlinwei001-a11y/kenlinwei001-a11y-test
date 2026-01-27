@@ -1,3 +1,4 @@
+
 import React, { useMemo } from 'react';
 import { GraphData, NodeType } from '../types';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Cell, PieChart, Pie, Legend } from 'recharts';
@@ -78,7 +79,7 @@ const DashboardPanel: React.FC<Props> = ({ data }) => {
       if (active && payload && payload.length) {
           const data = payload[0].payload;
           return (
-              <div className="bg-white p-2 border border-slate-200 rounded shadow-lg text-xs">
+              <div className="bg-white p-3 border border-slate-200 rounded shadow-lg text-sm">
                   <div className="font-bold text-slate-700 mb-1">{data.fullName}</div>
                   <div className="flex justify-between gap-4 mb-1">
                       <span className="text-slate-500">预测:</span>
@@ -95,8 +96,8 @@ const DashboardPanel: React.FC<Props> = ({ data }) => {
                       </span>
                   </div>
                   {data.isHighDeviation && (
-                      <div className="text-[10px] text-red-500 mt-1 flex items-center gap-1">
-                          <AlertTriangle size={10}/> 偏差过大 ({'>'}20%)
+                      <div className="text-xs text-red-500 mt-1 flex items-center gap-1">
+                          <AlertTriangle size={12}/> 偏差过大 ({'>'}20%)
                       </div>
                   )}
               </div>
@@ -107,34 +108,34 @@ const DashboardPanel: React.FC<Props> = ({ data }) => {
 
   return (
     <div className="flex flex-col h-full bg-slate-50/50 backdrop-blur-sm w-full">
-       <div className="p-5 border-b border-slate-200 bg-white sticky top-0 z-10 flex items-center justify-between">
+       <div className="p-6 border-b border-slate-200 bg-white sticky top-0 z-10 flex items-center justify-between">
             <div>
-                <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                    <Activity className="text-blue-600" size={20}/>
+                <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                    <Activity className="text-blue-600" size={24}/>
                     全局运营看板
                 </h2>
-                <p className="text-xs text-slate-500 mt-1">Real-time Supply Chain Analytics</p>
+                <p className="text-sm text-slate-500 mt-1">Real-time Supply Chain Analytics</p>
             </div>
             <div className="px-3 py-1 bg-green-100 text-green-700 text-xs font-bold rounded-full flex items-center gap-1">
-                <Zap size={12}/> Live
+                <Zap size={14}/> Live
             </div>
        </div>
 
-       <div className="flex-1 overflow-y-auto p-5 space-y-6">
+       <div className="flex-1 overflow-y-auto p-6 space-y-6">
             
             {/* 1. Health & Alerts */}
-            <div className="grid grid-cols-2 gap-4">
-                <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-                    <h3 className="text-xs font-bold text-slate-500 uppercase mb-3 flex items-center gap-1">
-                        <AlertTriangle size={12}/> 节点健康分布
+            <div className="grid grid-cols-2 gap-6">
+                <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+                    <h3 className="text-sm font-bold text-slate-500 uppercase mb-3 flex items-center gap-1">
+                        <AlertTriangle size={16}/> 节点健康分布
                     </h3>
-                    <div className="h-24 flex items-center">
+                    <div className="h-28 flex items-center">
                         <ResponsiveContainer width="50%" height="100%">
                             <PieChart>
                                 <Pie 
                                     data={healthDataPie} 
-                                    innerRadius={25} 
-                                    outerRadius={40} 
+                                    innerRadius={30} 
+                                    outerRadius={50} 
                                     paddingAngle={2} 
                                     dataKey="value"
                                 >
@@ -144,11 +145,11 @@ const DashboardPanel: React.FC<Props> = ({ data }) => {
                                 </Pie>
                             </PieChart>
                         </ResponsiveContainer>
-                        <div className="flex-1 space-y-1">
+                        <div className="flex-1 space-y-2">
                             {healthDataPie.map(item => (
-                                <div key={item.name} className="flex justify-between text-xs">
-                                    <span className="flex items-center gap-1 text-slate-500">
-                                        <div className="w-2 h-2 rounded-full" style={{background: item.color}}></div>
+                                <div key={item.name} className="flex justify-between text-sm">
+                                    <span className="flex items-center gap-2 text-slate-500">
+                                        <div className="w-2.5 h-2.5 rounded-full" style={{background: item.color}}></div>
                                         {item.name}
                                     </span>
                                     <span className="font-bold">{item.value}</span>
@@ -158,17 +159,17 @@ const DashboardPanel: React.FC<Props> = ({ data }) => {
                     </div>
                 </div>
 
-                <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
-                     <h3 className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1">
-                        <Factory size={12}/> 产线综合效率 (OEE)
+                <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
+                     <h3 className="text-sm font-bold text-slate-500 uppercase flex items-center gap-1">
+                        <Factory size={16}/> 产线综合效率 (OEE)
                     </h3>
                     <div className="flex items-end gap-1 mt-2">
-                        <span className="text-3xl font-bold text-indigo-600">{metrics.avgOEE.toFixed(1)}</span>
-                        <span className="text-sm font-bold text-slate-400 mb-1">%</span>
+                        <span className="text-4xl font-bold text-indigo-600">{metrics.avgOEE.toFixed(1)}</span>
+                        <span className="text-lg font-bold text-slate-400 mb-1">%</span>
                     </div>
-                    <div className="w-full bg-slate-100 rounded-full h-2 mt-2">
+                    <div className="w-full bg-slate-100 rounded-full h-3 mt-3">
                         <div 
-                            className="h-2 rounded-full bg-indigo-500 transition-all duration-1000" 
+                            className="h-3 rounded-full bg-indigo-500 transition-all duration-1000" 
                             style={{width: `${metrics.avgOEE}%`}}
                         ></div>
                     </div>
@@ -176,22 +177,22 @@ const DashboardPanel: React.FC<Props> = ({ data }) => {
             </div>
 
             {/* 2. Inventory Overview */}
-            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+            <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
                 <div className="flex justify-between items-start mb-4">
-                    <h3 className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1">
-                        <Database size={12}/> 全网库存水位
+                    <h3 className="text-sm font-bold text-slate-500 uppercase flex items-center gap-1">
+                        <Database size={16}/> 全网库存水位
                     </h3>
                     <div className="text-right">
-                        <div className="text-2xl font-bold text-slate-800">
+                        <div className="text-3xl font-bold text-slate-800">
                             {(metrics.totalInventory / 10000).toFixed(2)}
-                            <span className="text-sm text-slate-400 font-normal ml-1">万Ah</span>
+                            <span className="text-base text-slate-400 font-normal ml-1">万Ah</span>
                         </div>
-                        <div className="text-[10px] text-emerald-600 font-bold flex items-center justify-end gap-1">
-                            <TrendingUp size={10}/> 环比 +4.2%
+                        <div className="text-xs text-emerald-600 font-bold flex items-center justify-end gap-1 mt-1">
+                            <TrendingUp size={12}/> 环比 +4.2%
                         </div>
                     </div>
                 </div>
-                <div className="h-32 w-full">
+                <div className="h-40 w-full">
                     <ResponsiveContainer width="100%" height="100%">
                         <AreaChart data={inventoryTrendData}>
                             <defs>
@@ -201,8 +202,8 @@ const DashboardPanel: React.FC<Props> = ({ data }) => {
                                 </linearGradient>
                             </defs>
                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9"/>
-                            <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#94a3b8'}}/>
-                            <Tooltip contentStyle={{fontSize: '12px'}}/>
+                            <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#94a3b8'}}/>
+                            <Tooltip contentStyle={{fontSize: '14px'}}/>
                             <Area type="monotone" dataKey="value" stroke="#3b82f6" strokeWidth={3} fillOpacity={1} fill="url(#colorTotalInv)" />
                         </AreaChart>
                     </ResponsiveContainer>
@@ -210,22 +211,22 @@ const DashboardPanel: React.FC<Props> = ({ data }) => {
             </div>
 
             {/* 3. Forecast vs Demand (UPDATED with Alert Logic) */}
-            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-                <h3 className="text-xs font-bold text-slate-500 uppercase mb-4 flex items-center gap-1">
-                    <Package size={12}/> 客户预测 vs 实际订单
+            <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+                <h3 className="text-sm font-bold text-slate-500 uppercase mb-4 flex items-center gap-1">
+                    <Package size={16}/> 客户预测 vs 实际订单
                 </h3>
-                <div className="h-48 w-full">
+                <div className="h-60 w-full">
                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={metrics.demandData} layout="vertical" margin={{left: 10, right: 10}}>
+                        <BarChart data={metrics.demandData} layout="vertical" margin={{left: 20, right: 10}}>
                             <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#f1f5f9"/>
                             <XAxis type="number" hide/>
-                            <YAxis dataKey="name" type="category" width={80} tick={{fontSize: 10, fill: '#64748b'}} axisLine={false} tickLine={false}/>
+                            <YAxis dataKey="name" type="category" width={90} tick={{fontSize: 12, fill: '#64748b'}} axisLine={false} tickLine={false}/>
                             <Tooltip cursor={{fill: '#f8fafc'}} content={<ForecastTooltip />} />
-                            <Legend wrapperStyle={{fontSize: '10px'}}/>
-                            <Bar dataKey="forecast" name="预测需求" fill="#cbd5e1" radius={[0, 4, 4, 0]} barSize={8} />
+                            <Legend wrapperStyle={{fontSize: '12px'}}/>
+                            <Bar dataKey="forecast" name="预测需求" fill="#cbd5e1" radius={[0, 4, 4, 0]} barSize={12} />
                             
                             {/* Conditional Rendering for Order Bars */}
-                            <Bar dataKey="orders" name="在手订单" radius={[0, 4, 4, 0]} barSize={8}>
+                            <Bar dataKey="orders" name="在手订单" radius={[0, 4, 4, 0]} barSize={12}>
                                 {metrics.demandData.map((entry, index) => (
                                     <Cell 
                                         key={`cell-${index}`} 
@@ -236,31 +237,31 @@ const DashboardPanel: React.FC<Props> = ({ data }) => {
                         </BarChart>
                     </ResponsiveContainer>
                 </div>
-                <div className="flex justify-end gap-3 mt-2 text-[9px] text-slate-400">
-                     <div className="flex items-center gap-1"><div className="w-2 h-2 bg-slate-300 rounded-sm"></div>预测</div>
-                     <div className="flex items-center gap-1"><div className="w-2 h-2 bg-blue-500 rounded-sm"></div>正常订单</div>
-                     <div className="flex items-center gap-1"><div className="w-2 h-2 bg-red-500 rounded-sm"></div>偏差{'>'}20%</div>
+                <div className="flex justify-end gap-4 mt-3 text-xs text-slate-400">
+                     <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 bg-slate-300 rounded-sm"></div>预测</div>
+                     <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 bg-blue-500 rounded-sm"></div>正常订单</div>
+                     <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 bg-red-500 rounded-sm"></div>偏差{'>'}20%</div>
                 </div>
             </div>
 
             {/* 4. Material Data List */}
-            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-                 <h3 className="text-xs font-bold text-slate-500 uppercase mb-3 flex items-center gap-1">
-                    <Truck size={12}/> 关键物料供应监控
+            <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+                 <h3 className="text-sm font-bold text-slate-500 uppercase mb-3 flex items-center gap-1">
+                    <Truck size={16}/> 关键物料供应监控
                 </h3>
-                <div className="space-y-2">
+                <div className="space-y-3">
                     {[
                         { name: '电池级碳酸锂', status: '充足', trend: 'stable', stock: '240T' },
                         { name: 'PVDF粘结剂', status: '紧张', trend: 'down', stock: '15T' },
                         { name: '负极石墨', status: '充足', trend: 'up', stock: '850T' },
                     ].map((item, i) => (
-                        <div key={i} className="flex items-center justify-between p-2 bg-slate-50 rounded border border-slate-100 text-xs">
+                        <div key={i} className="flex items-center justify-between p-3 bg-slate-50 rounded border border-slate-100 text-sm">
                             <span className="font-medium text-slate-700">{item.name}</span>
-                            <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-4">
                                 <span className="font-mono text-slate-600">{item.stock}</span>
-                                <span className={`px-1.5 py-0.5 rounded ${
+                                <span className={`px-2 py-0.5 rounded ${
                                     item.status === '充足' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
-                                } font-bold`}>{item.status}</span>
+                                } font-bold text-xs`}>{item.status}</span>
                             </div>
                         </div>
                     ))}

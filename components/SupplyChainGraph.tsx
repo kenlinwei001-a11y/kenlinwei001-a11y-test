@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef } from 'react';
 import * as d3 from 'd3';
 import { GraphData, NodeData, NodeType } from '../types';
@@ -225,12 +226,12 @@ const SupplyChainGraph: React.FC<Props> = ({ data, onNodeHover, onNodeClick, onB
             .attr("stroke-linejoin", "round");
       }
 
-      // Label
+      // Label (Increased Font Size)
       el.append("text")
         .text(d.name)
-        .attr("y", 25)
+        .attr("y", 28)
         .attr("text-anchor", "middle")
-        .attr("font-size", "10px")
+        .attr("font-size", "12px")
         .attr("fill", isCritical ? "#ef4444" : "#475569")
         .attr("font-weight", isCritical ? "700" : "500")
         .style("pointer-events", "none")
@@ -241,12 +242,12 @@ const SupplyChainGraph: React.FC<Props> = ({ data, onNodeHover, onNodeClick, onB
             .text("!")
             .attr("y", 5)
             .attr("text-anchor", "middle")
-            .attr("font-size", "12px")
+            .attr("font-size", "14px")
             .attr("fill", strokeColor)
             .attr("font-weight", "bold");
       }
 
-      // Stats Badge
+      // Stats Badge (Increased Font Size)
       if ((d.type === NodeType.SUPPLIER || d.type === NodeType.BASE) && d.inventoryLevel !== undefined) {
          const hasIssue = d.activeAlerts > 0;
          const badgeColor = hasIssue ? "#fee2e2" : "#f8fafc";
@@ -255,11 +256,11 @@ const SupplyChainGraph: React.FC<Props> = ({ data, onNodeHover, onNodeClick, onB
          const formattedValue = d3.format(".2s")(d.inventoryLevel); 
 
          el.append("rect")
-           .attr("x", -16)
-           .attr("y", 30)
-           .attr("width", 32)
-           .attr("height", 12)
-           .attr("rx", 6)
+           .attr("x", -18)
+           .attr("y", 34)
+           .attr("width", 36)
+           .attr("height", 14)
+           .attr("rx", 7)
            .attr("fill", badgeColor)
            .attr("stroke", badgeBorder)
            .attr("stroke-width", 1);
@@ -267,9 +268,9 @@ const SupplyChainGraph: React.FC<Props> = ({ data, onNodeHover, onNodeClick, onB
          el.append("text")
            .text(formattedValue)
            .attr("x", 0)
-           .attr("y", 39)
+           .attr("y", 44)
            .attr("text-anchor", "middle")
-           .attr("font-size", "8px")
+           .attr("font-size", "10px")
            .attr("font-weight", "700")
            .attr("fill", badgeText)
            .style("pointer-events", "none");
@@ -327,7 +328,7 @@ const SupplyChainGraph: React.FC<Props> = ({ data, onNodeHover, onNodeClick, onB
   return (
     <div className="relative w-full h-full">
         {/* Legend */}
-        <div className="absolute top-4 right-4 z-10 bg-white/90 backdrop-blur border border-slate-200 p-2 rounded shadow-sm text-[10px] text-slate-600 space-y-2 pointer-events-none select-none">
+        <div className="absolute top-4 right-4 z-10 bg-white/90 backdrop-blur border border-slate-200 p-3 rounded shadow-sm text-xs text-slate-600 space-y-2 pointer-events-none select-none">
             <div className="font-bold border-b border-slate-100 pb-1 mb-1">图例说明</div>
             <div className="flex items-center gap-2">
                 <div className="w-6 h-[2px] bg-slate-400 opacity-40"></div>
@@ -338,7 +339,7 @@ const SupplyChainGraph: React.FC<Props> = ({ data, onNodeHover, onNodeClick, onB
                 <span>高频/大宗供货</span>
             </div>
              <div className="flex items-center gap-2">
-                <div className="w-8 h-3 rounded-full border border-slate-300 bg-slate-50 flex items-center justify-center text-[8px] font-bold text-slate-500">2.5k</div>
+                <div className="w-10 h-4 rounded-full border border-slate-300 bg-slate-50 flex items-center justify-center text-[10px] font-bold text-slate-500">2.5k</div>
                 <span>实时库存 (Ah)</span>
             </div>
         </div>
