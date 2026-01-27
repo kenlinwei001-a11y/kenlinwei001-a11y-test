@@ -5,6 +5,7 @@ import SupplyChainGraph from './components/SupplyChainGraph';
 import ConstraintPanel from './components/ConstraintPanel';
 import AIChat from './components/AIChat';
 import Tooltip from './components/Tooltip';
+import AnomalyAnalysisModal from './components/AnomalyAnalysisModal';
 import { MOCK_DATA, INITIAL_CONSTRAINTS } from './constants';
 import { GraphData, NodeData, ConstraintCategory, ScenarioConfig, ChatMessage, NodeType, ConstraintItem } from './types';
 
@@ -12,6 +13,7 @@ function App() {
   const [constraints, setConstraints] = useState<ConstraintCategory[]>(INITIAL_CONSTRAINTS);
   const [graphData, setGraphData] = useState<GraphData>(MOCK_DATA);
   const [hoveredNode, setHoveredNode] = useState<{ node: NodeData | null; x: number; y: number }>({ node: null, x: 0, y: 0 });
+  const [selectedAnomalyNode, setSelectedAnomalyNode] = useState<NodeData | null>(null);
   const [dimensions, setDimensions] = useState({ width: window.innerWidth - 680, height: window.innerHeight - 60 });
   
   // Chat State moved to App to allow injection of Simulation Reports
@@ -359,6 +361,10 @@ function App() {
     setHoveredNode({ node, x, y });
   }, []);
 
+  const handleDrillDown = useCallback((node: NodeData) => {
+    setSelectedAnomalyNode(node);
+  }, []);
+
   return (
     <div className="flex flex-col h-screen bg-slate-100 overflow-hidden">
       {/* Header */}
@@ -442,7 +448,11 @@ function App() {
            />
            
            {/* Floating Tooltip */}
-           <Tooltip node={hoveredNode.node} position={hoveredNode.node ? { x: hoveredNode.x, y: hoveredNode.y } : null} />
+           <Tooltip 
+             node={hoveredNode.node} 
+             position={hoveredNode.node ? { x: hoveredNode.x, y: hoveredNode.y } : null} 
+             onDrillDown={handleDrillDown}
+           />
         </div>
 
         {/* Right Panel: AI Chat */}
@@ -454,6 +464,15 @@ function App() {
            />
         </div>
       </div>
+
+      {/* Anomaly Analysis Modal Overlay */}
+      {selectedAnomalyNode && (
+        <AnomalyAnalysisModal 
+          node={selectedAnomalyNode} 
+          graph={graphData} 
+          onClose={() => setSelectedAnomalyNode(null)} 
+        />
+      )}
     </div>
   );
 }

@@ -7,6 +7,25 @@ export enum NodeType {
 
 export type NodeStatus = 'normal' | 'warning' | 'critical';
 
+export interface ProductionLineData {
+  id: string;
+  name: string;
+  type: 'LFP' | 'NCM' | 'Pack';
+  status: 'running' | 'maintenance' | 'idle' | 'error';
+  efficiency: number; // OEE
+  yieldRate: number; // Quality Yield
+  currentProduct: string;
+}
+
+export interface OrderData {
+  id: string;
+  product: string;
+  volume: number;
+  progress: number; // 0-100
+  dueDate: string;
+  status: 'on-track' | 'delayed' | 'risk';
+}
+
 export interface NodeData {
   id: string;
   name: string;
@@ -14,13 +33,24 @@ export interface NodeData {
   status?: NodeStatus; // visual status
   x?: number; 
   y?: number;
-  // Dynamic Metrics
-  inventoryLevel?: number; 
-  capacityUtilization?: number; 
+  
+  // Base Specific
+  inventoryLevel?: number;
+  inventoryCapacity?: number;
+  inventoryHistory?: { day: string; value: number; safeLine: number }[]; // For Sparkline
+  productionLines?: ProductionLineData[];
+  
+  // Customer Specific
   demandForecast?: number; 
+  activeOrders?: OrderData[];
+  supplyingBases?: string[]; // Names of bases supplying this customer
+
+  // Supplier Specific
   deliveryAccuracy?: number; 
+
+  // Generic Metrics
+  capacityUtilization?: number; 
   onTimeRate?: number; 
-  qualityYield?: number; 
   activeAlerts?: number;
   details?: {
     batchDelivery?: string[];

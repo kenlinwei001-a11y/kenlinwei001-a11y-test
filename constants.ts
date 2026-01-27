@@ -1,4 +1,4 @@
-import { ConstraintCategory, GraphData, NodeType, NodeData, LinkData, ScenarioEvent } from './types';
+import { ConstraintCategory, GraphData, NodeType, NodeData, LinkData, ScenarioEvent, ProductionLineData, OrderData } from './types';
 
 // Existing Constraints
 export const INITIAL_CONSTRAINTS: ConstraintCategory[] = [
@@ -89,6 +89,39 @@ export const INITIAL_SCENARIOS: ScenarioEvent[] = [
   }
 ];
 
+// Helper to generate sparkline data
+const generateInventoryHistory = (baseLevel: number) => {
+    return Array.from({ length: 14 }, (_, i) => ({
+        day: `D-${14-i}`,
+        value: baseLevel * (0.8 + Math.random() * 0.4), // +/- variance
+        safeLine: 2000
+    }));
+};
+
+const generateProductionLines = (baseId: string): ProductionLineData[] => {
+    const types: ('LFP' | 'NCM' | 'Pack')[] = ['LFP', 'NCM', 'Pack'];
+    return Array.from({ length: 3 }, (_, i) => ({
+        id: `${baseId}-line-${i}`,
+        name: `Line ${i+1} (${types[i]})`,
+        type: types[i],
+        status: Math.random() > 0.85 ? 'maintenance' : (Math.random() > 0.9 ? 'error' : 'running'),
+        efficiency: 92 + Math.random() * 6, // 92-98%
+        yieldRate: 95 + Math.random() * 4, // 95-99%
+        currentProduct: types[i] === 'Pack' ? 'Pack-590Mod' : 'Cell-280Ah'
+    }));
+};
+
+const generateOrders = (custId: string): OrderData[] => {
+    return Array.from({ length: Math.floor(Math.random() * 3) + 2 }, (_, i) => ({
+        id: `ORD-${custId.split('-')[1]}-${100+i}`,
+        product: Math.random() > 0.5 ? '5系高压三元' : '磷酸铁锂-储能',
+        volume: Math.floor(Math.random() * 500) + 100,
+        progress: Math.floor(Math.random() * 90),
+        dueDate: `2024-11-${15 + i*5}`,
+        status: Math.random() > 0.8 ? 'delayed' : 'on-track'
+    }));
+};
+
 // Generate Mock Data for the Graph
 const generateMockData = (): GraphData => {
   const nodes: NodeData[] = [];
@@ -103,20 +136,25 @@ const generateMockData = (): GraphData => {
       type: NodeType.SUPPLIER,
       status: 'normal',
       inventoryLevel: Math.floor(Math.random() * 5000) + 1000,
-      activeAlerts: Math.random() > 0.8 ? 1 : 0
+      activeAlerts: Math.random() > 0.8 ? 1 : 0,
+      deliveryAccuracy: 95 + Math.random() * 5
     });
   });
 
   // 2. Bases (10)
   const baseLocations = ['宁德基地', '宜宾基地', '溧阳基地', '西宁基地', '肇庆基地', '宜春基地', '贵阳基地', '厦门基地', '福鼎基地', '德国图林根'];
   baseLocations.forEach((name, i) => {
+    const inventory = Math.floor(Math.random() * 20000) + 5000;
     nodes.push({
       id: `base-${i}`,
       name,
       type: NodeType.BASE,
       status: 'normal',
       capacityUtilization: 85 + Math.random() * 10,
-      inventoryLevel: Math.floor(Math.random() * 20000) + 5000,
+      inventoryLevel: inventory,
+      inventoryCapacity: 30000,
+      inventoryHistory: generateInventoryHistory(inventory),
+      productionLines: generateProductionLines(`base-${i}`),
       details: {
         batchDelivery: ['2023-W42', '2023-W44', '2023-W46'],
         monthlyForecast: [120, 130, 145, 140, 155, 160],
@@ -136,6 +174,8 @@ const generateMockData = (): GraphData => {
       demandForecast: Math.floor(Math.random() * 10000) + 5000,
       deliveryAccuracy: 92 + Math.random() * 8,
       onTimeRate: 90 + Math.random() * 10,
+      activeOrders: generateOrders(`cust-${i}`),
+      supplyingBases: [], // Filled during linking
       details: {
         batchDelivery: ['批次A-101', '批次B-202', '批次C-303'],
         monthlyForecast: Array.from({length: 6}, () => Math.floor(Math.random() * 1000) + 500),
@@ -180,6 +220,11 @@ const generateMockData = (): GraphData => {
     }
 
     targetIndices.forEach(custIndex => {
+      const custNode = nodes.find(n => n.id === `cust-${custIndex}`);
+      if (custNode && custNode.supplyingBases) {
+          custNode.supplyingBases.push(base.name);
+      }
+
       // Simulate Pack Delivery Volume (e.g., Sets/Month)
       // Some links are high volume main supply lines, others are backup
       const isMainRoute = Math.random() > 0.6;
