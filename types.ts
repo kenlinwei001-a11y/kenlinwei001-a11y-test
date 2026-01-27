@@ -132,7 +132,7 @@ export interface ChatMessage {
 }
 
 // --- SETTINGS & INTEGRATION ---
-export type LLMProvider = 'gemini' | 'kimi' | 'rendu';
+export type LLMProvider = 'glm' | 'kimi' | 'rendu';
 
 export interface LLMConfig {
   provider: LLMProvider;
@@ -151,6 +151,7 @@ export interface ThemeConfig {
   productionColor: string;
   inventoryColor: string;
   salesColor: string;
+  capacityColor: string;
 }
 
 // Connector Types

@@ -1,8 +1,8 @@
 
 import React, { useMemo } from 'react';
 import { GraphData, NodeType } from '../types';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Cell, PieChart, Pie, Legend } from 'recharts';
-import { Activity, Package, TrendingUp, AlertTriangle, Database, Zap, Truck, Factory } from 'lucide-react';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Cell, PieChart, Pie, Legend, LineChart, Line, ComposedChart } from 'recharts';
+import { Activity, Package, TrendingUp, AlertTriangle, Database, Zap, Truck, Factory, BarChart4 } from 'lucide-react';
 
 interface Props {
   data: GraphData;
@@ -62,10 +62,19 @@ const DashboardPanel: React.FC<Props> = ({ data }) => {
     return { totalInventory, avgInventoryUtilization, healthCounts, avgOEE, demandData };
   }, [data]);
 
-  // Mock Trend Data for Sparklines
-  const inventoryTrendData = Array.from({ length: 7 }, (_, i) => ({
-    day: `D-${7-i}`,
-    value: metrics.totalInventory * (0.9 + Math.random() * 0.2)
+  // Mock Trend Data for Sparklines (30 Days)
+  const inventoryTrendData = useMemo(() => {
+      return Array.from({ length: 30 }, (_, i) => ({
+        day: `D-${30-i}`,
+        value: metrics.totalInventory * (0.85 + Math.random() * 0.3) // Adds variance
+      }));
+  }, [metrics.totalInventory]);
+
+  // Mock Capacity Data for summary card (Mini 12-month)
+  const capacitySummaryData = Array.from({length: 12}, (_, i) => ({
+      name: `M${i+1}`,
+      capacity: 100 + Math.random() * 10,
+      demand: 80 + (i * 5) + Math.random() * 10 // Growing demand
   }));
 
   const healthDataPie = [
@@ -176,11 +185,11 @@ const DashboardPanel: React.FC<Props> = ({ data }) => {
                 </div>
             </div>
 
-            {/* 2. Inventory Overview */}
+            {/* 2. Inventory Overview (Updated with 30-day sparkline) */}
             <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
                 <div className="flex justify-between items-start mb-4">
                     <h3 className="text-sm font-bold text-slate-500 uppercase flex items-center gap-1">
-                        <Database size={16}/> 全网库存水位
+                        <Database size={16}/> 全网库存水位 (30天趋势)
                     </h3>
                     <div className="text-right">
                         <div className="text-3xl font-bold text-slate-800">
@@ -202,7 +211,7 @@ const DashboardPanel: React.FC<Props> = ({ data }) => {
                                 </linearGradient>
                             </defs>
                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9"/>
-                            <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#94a3b8'}}/>
+                            <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#94a3b8'}} interval={3} />
                             <Tooltip contentStyle={{fontSize: '14px'}}/>
                             <Area type="monotone" dataKey="value" stroke="#3b82f6" strokeWidth={3} fillOpacity={1} fill="url(#colorTotalInv)" />
                         </AreaChart>
@@ -210,7 +219,30 @@ const DashboardPanel: React.FC<Props> = ({ data }) => {
                 </div>
             </div>
 
-            {/* 3. Forecast vs Demand (UPDATED with Alert Logic) */}
+            {/* 3. NEW: Capacity Forecast Summary */}
+            <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm hover:border-orange-200 transition-colors group cursor-pointer" onClick={() => (window as any).setActiveView?.('capacity')}>
+                <div className="flex justify-between items-start mb-4">
+                    <h3 className="text-sm font-bold text-slate-500 uppercase flex items-center gap-1">
+                        <BarChart4 size={16}/> 12个月产能滚动预测
+                    </h3>
+                    <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded font-bold group-hover:bg-orange-200">M8 瓶颈预警</span>
+                </div>
+                <div className="h-40 w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                        <ComposedChart data={capacitySummaryData}>
+                            <XAxis dataKey="name" hide/>
+                            <Tooltip cursor={{fill: '#f8fafc'}} contentStyle={{fontSize: '12px'}}/>
+                            <Bar dataKey="demand" fill="#94a3b8" barSize={12} radius={[2,2,0,0]} name="需求"/>
+                            <Line type="monotone" dataKey="capacity" stroke="#f97316" strokeWidth={2} dot={false} name="产能"/>
+                        </ComposedChart>
+                    </ResponsiveContainer>
+                </div>
+                <div className="text-center text-xs text-blue-600 font-bold mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    点击查看详细工艺分析 &rarr;
+                </div>
+            </div>
+
+            {/* 4. Forecast vs Demand (UPDATED with Alert Logic) */}
             <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
                 <h3 className="text-sm font-bold text-slate-500 uppercase mb-4 flex items-center gap-1">
                     <Package size={16}/> 客户预测 vs 实际订单
@@ -244,7 +276,7 @@ const DashboardPanel: React.FC<Props> = ({ data }) => {
                 </div>
             </div>
 
-            {/* 4. Material Data List */}
+            {/* 5. Material Data List */}
             <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
                  <h3 className="text-sm font-bold text-slate-500 uppercase mb-3 flex items-center gap-1">
                     <Truck size={16}/> 关键物料供应监控

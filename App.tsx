@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Layers, Database, Activity, Share2, Menu, Play, RotateCcw, MessageSquare, LayoutDashboard, Settings2, Sliders, ChevronLeft, Zap, GitBranch, Settings, Package, ShoppingCart, Factory, AlertTriangle, Server, ArrowLeft, TrendingUp, TrendingDown, Clock, CheckCircle2, ArrowRight, Maximize, Minimize, AlertCircle, XCircle, ChevronRight } from 'lucide-react';
-import { GoogleGenAI, Type } from "@google/genai";
+import { Layers, Database, Activity, Share2, Menu, Play, RotateCcw, MessageSquare, LayoutDashboard, Settings2, Sliders, ChevronLeft, Zap, GitBranch, Settings, Package, ShoppingCart, Factory, AlertTriangle, Server, ArrowLeft, TrendingUp, TrendingDown, Clock, CheckCircle2, ArrowRight, Maximize, Minimize, AlertCircle, XCircle, ChevronRight, BarChart4 } from 'lucide-react';
+import { Type } from "@google/genai";
 import SupplyChainGraph from './components/SupplyChainGraph';
 import ConstraintPanel from './components/ConstraintPanel';
 import AIChat from './components/AIChat';
@@ -10,16 +10,18 @@ import InventoryPanel from './components/InventoryPanel';
 import SalesPanel from './components/SalesPanel';
 import ProductionMonitorPanel from './components/ProductionMonitorPanel';
 import SettingsPanel from './components/SettingsPanel';
+import CapacityPanel from './components/CapacityPanel';
 import Tooltip from './components/Tooltip';
 import { AnomalyAnalysisModal } from './components/AnomalyAnalysisModal';
 import { MOCK_DATA, INITIAL_CONSTRAINTS } from './constants';
 import { GraphData, NodeData, ConstraintCategory, ScenarioConfig, ChatMessage, ConstraintItem, LLMConfig, ThemeConfig, LayoutMode } from './types';
+import { ComposedChart, Bar, Line, XAxis, Tooltip as RechartsTooltip, ResponsiveContainer, Cell } from 'recharts';
 
 // Default Config
 const DEFAULT_LLM_CONFIG: LLMConfig = {
-    provider: 'gemini',
+    provider: 'glm',
     apiKey: process.env.API_KEY || '',
-    modelName: 'gemini-2.5-flash-latest'
+    modelName: 'glm-4-plus'
 };
 
 const DEFAULT_THEME: ThemeConfig = {
@@ -28,8 +30,16 @@ const DEFAULT_THEME: ThemeConfig = {
     operationsColor: 'bg-slate-900',
     productionColor: 'bg-[#FEF3C7]', // Bright Orange Yellow (Amber 100)
     inventoryColor: 'bg-[#eff6ff]', // Light Blue
-    salesColor: 'bg-white'
+    salesColor: 'bg-white',
+    capacityColor: 'bg-orange-50' // Default capacity card color
 };
+
+// Mini Mock Data for Capacity Card
+const CAP_FORECAST_MINI = Array.from({length: 12}, (_, i) => ({
+    name: `M${i+1}`,
+    capacity: 100,
+    demand: 80 + (i * 5) + Math.random() * 10
+}));
 
 function App() {
   const [constraints, setConstraints] = useState<ConstraintCategory[]>(INITIAL_CONSTRAINTS);
@@ -50,7 +60,7 @@ function App() {
   const [isAnalysisModalOpen, setIsAnalysisModalOpen] = useState(false);
 
   // View State
-  const [activeView, setActiveView] = useState<'home' | 'graph_full' | 'dashboard' | 'inventory' | 'sales' | 'production' | 'settings' | 'config' | 'scenario'>('home');
+  const [activeView, setActiveView] = useState<'home' | 'graph_full' | 'dashboard' | 'inventory' | 'sales' | 'production' | 'capacity' | 'settings' | 'config' | 'scenario'>('home');
   const [isChatOpen, setIsChatOpen] = useState(false); 
   const [isFullScreen, setIsFullScreen] = useState(false);
 
@@ -72,6 +82,26 @@ function App() {
     }
   ]);
   const [isAiThinking, setIsAiThinking] = useState(false);
+
+  // --- Helpers for Contrast ---
+  const isDark = (colorClass: string) => {
+      // Heuristic: If class contains '900', '800', '700', '600' (except some bright ones) it's likely dark
+      // Simple check for high numbers usually means dark background in Tailwind standard palette
+      if (!colorClass) return false;
+      return colorClass.includes('900') || colorClass.includes('800') || colorClass.includes('700') || colorClass.includes('600');
+  };
+
+  const getTextColor = (bgClass: string) => {
+      return isDark(bgClass) ? 'text-white' : 'text-slate-800';
+  };
+  
+  const getSubTextColor = (bgClass: string) => {
+      return isDark(bgClass) ? 'text-white/70' : 'text-slate-500';
+  };
+
+  const getCardInnerBg = (bgClass: string) => {
+      return isDark(bgClass) ? 'bg-white/10 border-white/10 text-white' : 'bg-white border-slate-100';
+  };
 
   // --- Handlers ---
 
@@ -158,21 +188,35 @@ function App() {
     };
   }, []);
 
-  // --- AI Logic (Kept same as before) ---
+  // --- AI Logic (Simulated for New Providers) ---
   const callAI = async (prompt: string, tools?: any[]) => {
-      if (llmConfig.provider === 'gemini') {
-          const ai = new GoogleGenAI({ apiKey: llmConfig.apiKey });
-          const response = await ai.models.generateContent({
-            model: llmConfig.modelName || 'gemini-2.5-flash-latest',
-            contents: [{ role: 'user', parts: [{ text: prompt }] }],
-            config: { tools: tools }
-          });
-          return { text: response.text, functionCalls: response.functionCalls };
-      } else if (llmConfig.provider === 'kimi') {
-           // Kimi Implementation Placeholder
-           return { text: "Kimi integration pending...", functionCalls: undefined };
+      if (llmConfig.provider === 'glm' || llmConfig.provider === 'kimi' || llmConfig.provider === 'rendu') {
+          await new Promise(resolve => setTimeout(resolve, 1500)); 
+
+          if (tools && tools.length > 0 && prompt.includes('learn_rule')) {
+              if (prompt.includes('如果') || prompt.includes('当') || prompt.includes('禁止') || prompt.includes('优先')) {
+                 return {
+                     text: undefined,
+                     functionCalls: [{
+                         name: 'learn_rule',
+                         args: {
+                             label: '自动提取业务规则 (Auto-Learned)',
+                             description: `基于对话内容自动识别的约束：${prompt.slice(prompt.indexOf('用户:') + 4).slice(0, 50)}...`,
+                             impactLevel: 'medium',
+                             pseudoLogic: 'AUTO_GENERATED_LOGIC_FROM_LLM'
+                         }
+                     }]
+                 };
+              }
+          }
+
+          const providerName = llmConfig.provider === 'glm' ? '智谱 GLM-4' : llmConfig.provider === 'rendu' ? '传神 Rendu' : 'Kimi';
+          return { 
+              text: `[${providerName} 模型响应]: \n\n我已理解您的需求。基于当前的供应链图谱数据与约束条件，该操作可能会导致下游交付延期风险增加 12%。建议您同步检查库存水位。\n\n(注：当前为前端演示模式，未实际调用 ${providerName} API)`, 
+              functionCalls: undefined 
+          };
       }
-      throw new Error("Unknown provider");
+      throw new Error("Unknown provider configuration");
   };
 
   const handleUserMessage = async (text: string) => {
@@ -181,7 +225,7 @@ function App() {
     setIsAiThinking(true);
 
     try {
-      const systemPrompt = `你是一个供应链专家助手... (省略重复Prompt)`;
+      const systemPrompt = `你是一个供应链专家助手...`;
       const learnRuleTool = {
           functionDeclarations: [{
               name: "learn_rule",
@@ -199,7 +243,7 @@ function App() {
           }]
       };
       
-      const aiResult = await callAI(systemPrompt + `\n用户: ${text}`, llmConfig.provider === 'gemini' ? [learnRuleTool] : undefined);
+      const aiResult = await callAI(systemPrompt + `\n用户: ${text}`, [learnRuleTool]);
       const functionCalls = aiResult.functionCalls;
       
       if (functionCalls && functionCalls.length > 0) {
@@ -310,33 +354,38 @@ function App() {
   }, []);
 
   // --- Layout Configuration Helpers ---
-  const getGridClasses = (mode: LayoutMode, cardType: 'hero' | 'ops' | 'prod' | 'inv' | 'sales') => {
+  const getGridClasses = (mode: LayoutMode, cardType: 'hero' | 'ops' | 'prod' | 'inv' | 'sales' | 'cap') => {
       if (mode === 'cinematic') {
           // Top heavy layout: Hero takes full top, others small below
           switch (cardType) {
               case 'hero': return 'col-span-12 row-span-7';
-              case 'ops': return 'col-span-3 row-span-5';
-              case 'prod': return 'col-span-3 row-span-5';
+              case 'ops': return 'col-span-2 row-span-5';
+              case 'prod': return 'col-span-2 row-span-5';
               case 'inv': return 'col-span-3 row-span-5';
               case 'sales': return 'col-span-3 row-span-5';
+              case 'cap': return 'col-span-2 row-span-5';
           }
       } else if (mode === 'balanced') {
           // Left/Right Split: Hero & Ops Left, Others Right
           switch (cardType) {
               case 'hero': return 'col-span-6 row-span-8'; // Left Top
               case 'ops': return 'col-span-6 row-span-4'; // Left Bottom
-              case 'prod': return 'col-span-6 row-span-4'; // Right Top
-              case 'inv': return 'col-span-6 row-span-4'; // Right Middle
-              case 'sales': return 'col-span-6 row-span-4'; // Right Bottom
+              // Right Column Split
+              case 'prod': return 'col-span-6 row-span-3'; 
+              case 'inv': return 'col-span-6 row-span-3'; 
+              case 'sales': return 'col-span-6 row-span-3';
+              case 'cap': return 'col-span-6 row-span-3';
           }
       } else {
-          // Default Bento
+          // Default Bento (Adjusted for 3 bottom cards)
           switch (cardType) {
               case 'hero': return 'col-span-8 row-span-8';
               case 'ops': return 'col-span-4 row-span-4';
               case 'prod': return 'col-span-4 row-span-4';
-              case 'inv': return 'col-span-6 row-span-4';
-              case 'sales': return 'col-span-6 row-span-4';
+              // Bottom Row (4+4+4 = 12)
+              case 'inv': return 'col-span-4 row-span-4';
+              case 'sales': return 'col-span-4 row-span-4';
+              case 'cap': return 'col-span-4 row-span-4';
           }
       }
       return '';
@@ -395,6 +444,7 @@ function App() {
                 { id: 'inventory', icon: Package, label: '库存' },
                 { id: 'sales', icon: ShoppingCart, label: '产销' },
                 { id: 'production', icon: Factory, label: '产线' },
+                { id: 'capacity', icon: BarChart4, label: '产能' }, // New Item
             ].map((item) => (
                 <button 
                     key={item.id}
@@ -482,31 +532,31 @@ function App() {
                         {/* 2. Operations: Top Right */}
                         <div 
                             onClick={() => setActiveView('dashboard')}
-                            className={`${getGridClasses(theme.layoutMode, 'ops')} ${theme.operationsColor} rounded-[24px] p-6 relative overflow-hidden group cursor-pointer shadow-lg transition-all duration-300 hover:translate-y-[-2px] border border-slate-800`}
+                            className={`${getGridClasses(theme.layoutMode, 'ops')} ${theme.operationsColor} rounded-[24px] p-6 relative overflow-hidden group cursor-pointer shadow-lg transition-all duration-300 hover:translate-y-[-2px] border ${isDark(theme.operationsColor) ? 'border-transparent' : 'border-slate-800'}`}
                         >
                             <div className="flex justify-between items-start mb-6">
-                                <div className="p-3 bg-slate-800 rounded-xl text-white border border-slate-700 shadow-inner">
+                                <div className={`p-3 rounded-xl border shadow-inner ${isDark(theme.operationsColor) ? 'bg-white/10 border-white/10 text-white' : 'bg-slate-800 text-white border-slate-700'}`}>
                                     <LayoutDashboard size={24}/>
                                 </div>
-                                <ArrowRight className="text-slate-600 group-hover:text-white transition-colors -rotate-45 group-hover:rotate-0 transform duration-300" size={24}/>
+                                <ArrowRight className={`${isDark(theme.operationsColor) ? 'text-white/50 group-hover:text-white' : 'text-slate-600 group-hover:text-slate-900'} transition-colors -rotate-45 group-hover:rotate-0 transform duration-300`} size={24}/>
                             </div>
-                            <h3 className="text-2xl font-bold text-white mb-2">全局运营看板</h3>
+                            <h3 className={`text-2xl font-bold mb-2 ${getTextColor(theme.operationsColor)}`}>全局运营看板</h3>
                             <div className="grid grid-cols-2 gap-6 mt-6">
                                 <div>
-                                    <div className="text-slate-400 text-sm mb-1">综合 OEE</div>
+                                    <div className={`text-sm mb-1 ${getSubTextColor(theme.operationsColor)}`}>综合 OEE</div>
                                     <div className="text-3xl font-bold text-emerald-400 flex items-end gap-1">
                                         92.4<span className="text-sm text-emerald-600/70 mb-1">%</span>
                                     </div>
-                                    <div className="w-full bg-slate-800 h-1.5 rounded-full mt-2 overflow-hidden">
+                                    <div className={`w-full h-1.5 rounded-full mt-2 overflow-hidden ${isDark(theme.operationsColor) ? 'bg-black/30' : 'bg-slate-800'}`}>
                                         <div className="bg-emerald-500 h-full w-[92%]"></div>
                                     </div>
                                 </div>
                                 <div>
-                                    <div className="text-slate-400 text-sm mb-1">交付准时率</div>
+                                    <div className={`text-sm mb-1 ${getSubTextColor(theme.operationsColor)}`}>交付准时率</div>
                                     <div className="text-3xl font-bold text-blue-400 flex items-end gap-1">
                                         98.1<span className="text-sm text-blue-600/70 mb-1">%</span>
                                     </div>
-                                    <div className="w-full bg-slate-800 h-1.5 rounded-full mt-2 overflow-hidden">
+                                    <div className={`w-full h-1.5 rounded-full mt-2 overflow-hidden ${isDark(theme.operationsColor) ? 'bg-black/30' : 'bg-slate-800'}`}>
                                         <div className="bg-blue-500 h-full w-[98%]"></div>
                                     </div>
                                 </div>
@@ -516,11 +566,11 @@ function App() {
                         {/* 3. Production: Middle Right */}
                         <div 
                              onClick={() => setActiveView('production')}
-                             className={`${getGridClasses(theme.layoutMode, 'prod')} ${theme.productionColor} rounded-[24px] p-6 border border-slate-100 shadow-md group cursor-pointer relative transition-all duration-300 hover:shadow-lg hover:border-slate-200`}
+                             className={`${getGridClasses(theme.layoutMode, 'prod')} ${theme.productionColor} rounded-[24px] p-6 border shadow-md group cursor-pointer relative transition-all duration-300 hover:shadow-lg ${isDark(theme.productionColor) ? 'border-transparent' : 'border-slate-100 hover:border-slate-200'}`}
                         >
                             <div className="flex justify-between items-start mb-4">
                                 <div>
-                                    <h3 className="text-xl font-bold text-slate-800">产线异常监控</h3>
+                                    <h3 className={`text-xl font-bold ${getTextColor(theme.productionColor)}`}>产线异常监控</h3>
                                     <div className="flex items-center gap-1.5 mt-1">
                                         <span className="relative flex h-2 w-2">
                                           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
@@ -529,29 +579,29 @@ function App() {
                                         <p className="text-sm text-red-600 font-medium">2 Critical Alerts</p>
                                     </div>
                                 </div>
-                                <div className="bg-white p-2.5 rounded-full text-orange-500 shadow-sm border border-orange-100">
+                                <div className={`p-2.5 rounded-full shadow-sm border ${isDark(theme.productionColor) ? 'bg-white/10 text-white border-white/20' : 'bg-white text-orange-500 border-orange-100'}`}>
                                     <AlertTriangle size={22}/>
                                 </div>
                             </div>
                             
                             {/* Alert List - Specific Data */}
                             <div className="space-y-3 mt-4">
-                                <div className="flex items-center justify-between p-3 bg-white/80 border border-red-100 rounded-xl shadow-sm backdrop-blur-sm hover:bg-red-50/50 transition-colors">
+                                <div className={`flex items-center justify-between p-3 rounded-xl shadow-sm backdrop-blur-sm transition-colors ${getCardInnerBg(theme.productionColor)}`}>
                                     <div className="flex items-center gap-3">
                                         <XCircle size={18} className="text-red-500" />
                                         <div>
-                                            <div className="text-sm font-bold text-slate-800">武汉 Pack Line 3</div>
+                                            <div className={`text-sm font-bold ${getTextColor(theme.productionColor)}`}>武汉 Pack Line 3</div>
                                             <div className="text-xs text-red-500 font-medium">设备故障停机 (E-204)</div>
                                         </div>
                                     </div>
                                     <span className="text-xs font-bold bg-red-100 text-red-700 px-2 py-1 rounded">Stop</span>
                                 </div>
 
-                                <div className="flex items-center justify-between p-3 bg-white/80 border border-orange-100 rounded-xl shadow-sm backdrop-blur-sm hover:bg-orange-50/50 transition-colors">
+                                <div className={`flex items-center justify-between p-3 rounded-xl shadow-sm backdrop-blur-sm transition-colors ${getCardInnerBg(theme.productionColor)}`}>
                                     <div className="flex items-center gap-3">
                                         <AlertCircle size={18} className="text-orange-500" />
                                         <div>
-                                            <div className="text-sm font-bold text-slate-800">洛阳 Coating A</div>
+                                            <div className={`text-sm font-bold ${getTextColor(theme.productionColor)}`}>洛阳 Coating A</div>
                                             <div className="text-xs text-orange-500 font-medium">良率波动 (94.2%)</div>
                                         </div>
                                     </div>
@@ -563,31 +613,31 @@ function App() {
                         {/* 4. Inventory: Bottom Left */}
                         <div 
                             onClick={() => setActiveView('inventory')}
-                            className={`${getGridClasses(theme.layoutMode, 'inv')} ${theme.inventoryColor} rounded-[24px] p-6 border border-slate-100 shadow-md group cursor-pointer relative transition-all duration-300 hover:border-slate-200`}
+                            className={`${getGridClasses(theme.layoutMode, 'inv')} ${theme.inventoryColor} rounded-[24px] p-6 border shadow-md group cursor-pointer relative transition-all duration-300 ${isDark(theme.inventoryColor) ? 'border-transparent' : 'border-slate-100 hover:border-slate-200'}`}
                         >
                              <div className="flex justify-between items-start mb-4">
                                 <div className="flex items-center gap-3">
-                                    <div className="w-12 h-12 rounded-xl bg-white text-indigo-600 border border-indigo-50 shadow-sm flex items-center justify-center">
+                                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center border shadow-sm ${isDark(theme.inventoryColor) ? 'bg-white/10 border-white/10 text-white' : 'bg-white text-indigo-600 border-indigo-50'}`}>
                                         <Package size={24}/>
                                     </div>
                                     <div>
-                                        <h3 className="text-xl font-bold text-slate-800">库存滚动监控</h3>
-                                        <p className="text-sm text-slate-500">Inventory Monitoring</p>
+                                        <h3 className={`text-xl font-bold ${getTextColor(theme.inventoryColor)}`}>库存滚动监控</h3>
+                                        <p className={`text-sm ${getSubTextColor(theme.inventoryColor)}`}>Inventory Monitoring</p>
                                     </div>
                                 </div>
-                                <ArrowRight className="text-slate-300 group-hover:text-indigo-600 transition-colors" size={24}/>
+                                <ArrowRight className={`${isDark(theme.inventoryColor) ? 'text-white/50 group-hover:text-white' : 'text-slate-300 group-hover:text-indigo-600'} transition-colors`} size={24}/>
                             </div>
                             
                             <div className="grid grid-cols-2 gap-6 mt-2">
                                 <div className="space-y-4">
                                     <div className="flex justify-between items-end">
-                                        <span className="text-sm text-slate-500 font-medium">成品周转</span>
-                                        <span className="text-3xl font-bold text-slate-800">28.5<span className="text-sm text-slate-400 ml-1 font-normal">天</span></span>
+                                        <span className={`text-sm font-medium ${getSubTextColor(theme.inventoryColor)}`}>成品周转</span>
+                                        <span className={`text-3xl font-bold ${getTextColor(theme.inventoryColor)}`}>28.5<span className={`text-sm ml-1 font-normal ${getSubTextColor(theme.inventoryColor)}`}>天</span></span>
                                     </div>
-                                    <div className="w-full bg-slate-200 rounded-full h-2">
+                                    <div className={`w-full rounded-full h-2 ${isDark(theme.inventoryColor) ? 'bg-black/20' : 'bg-slate-200'}`}>
                                         <div className="bg-indigo-500 h-2 rounded-full w-[60%]"></div>
                                     </div>
-                                    <div className="flex justify-between text-xs text-slate-400">
+                                    <div className={`flex justify-between text-xs ${getSubTextColor(theme.inventoryColor)}`}>
                                         <span>Target: 30天</span>
                                         <span className="text-emerald-600 font-bold flex items-center gap-1"><TrendingDown size={12}/> -1.2</span>
                                     </div>
@@ -595,86 +645,130 @@ function App() {
 
                                 {/* Specific Abnormal Inventory Items */}
                                 <div className="space-y-2">
-                                    <div className="text-xs font-bold text-slate-400 uppercase mb-2">重点关注物料</div>
-                                    <div className="flex items-center justify-between text-sm bg-white p-2 rounded-lg border border-slate-100 shadow-sm">
-                                        <span className="text-slate-700 font-medium">碳酸锂 (Li2CO3)</span>
+                                    <div className={`text-xs font-bold uppercase mb-2 ${isDark(theme.inventoryColor) ? 'text-white/50' : 'text-slate-400'}`}>重点关注物料</div>
+                                    <div className={`flex items-center justify-between text-sm p-2 rounded-lg border shadow-sm ${getCardInnerBg(theme.inventoryColor)}`}>
+                                        <span className="font-medium">碳酸锂 (Li2CO3)</span>
                                         <span className="font-bold text-red-600">120T <span className="text-[10px] font-normal text-red-400">(缺货)</span></span>
                                     </div>
-                                    <div className="flex items-center justify-between text-sm bg-white p-2 rounded-lg border border-slate-100 shadow-sm">
-                                        <span className="text-slate-700 font-medium">5系三元前驱体</span>
-                                        <span className="font-bold text-slate-700">850T <span className="text-[10px] font-normal text-slate-400">(正常)</span></span>
+                                    <div className={`flex items-center justify-between text-sm p-2 rounded-lg border shadow-sm ${getCardInnerBg(theme.inventoryColor)}`}>
+                                        <span className="font-medium">5系三元前驱体</span>
+                                        <span className={`font-bold ${isDark(theme.inventoryColor) ? 'text-white' : 'text-slate-700'}`}>850T <span className={`text-[10px] font-normal ${isDark(theme.inventoryColor) ? 'text-white/50' : 'text-slate-400'}`}>(正常)</span></span>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        {/* 5. Sales: Bottom Right */}
+                        {/* 5. Sales: Bottom Middle (Shifted) */}
                         <div 
                              onClick={() => setActiveView('sales')}
-                             className={`${getGridClasses(theme.layoutMode, 'sales')} ${theme.salesColor} rounded-[24px] p-6 border border-slate-100 shadow-md group cursor-pointer relative transition-all duration-300 hover:border-slate-300`}
+                             className={`${getGridClasses(theme.layoutMode, 'sales')} ${theme.salesColor} rounded-[24px] p-6 border shadow-md group cursor-pointer relative transition-all duration-300 ${isDark(theme.salesColor) ? 'border-transparent' : 'border-slate-100 hover:border-slate-300'}`}
                         >
                             <div className="flex justify-between items-start mb-4">
                                 <div className="flex items-center gap-3">
-                                    <div className="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-100">
+                                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center border ${isDark(theme.salesColor) ? 'bg-white/10 border-white/10 text-white' : 'bg-emerald-50 text-emerald-600 border-emerald-100'}`}>
                                         <ShoppingCart size={24}/>
                                     </div>
                                     <div>
-                                        <h3 className="text-xl font-bold text-slate-800">产销机会协同</h3>
-                                        <p className="text-sm text-slate-500">S&OP Planning</p>
+                                        <h3 className={`text-xl font-bold ${getTextColor(theme.salesColor)}`}>产销机会协同</h3>
+                                        <p className={`text-sm ${getSubTextColor(theme.salesColor)}`}>S&OP Planning</p>
                                     </div>
                                 </div>
-                                <ArrowRight className="text-slate-300 group-hover:text-emerald-600 transition-colors" size={24}/>
+                                <ArrowRight className={`${isDark(theme.salesColor) ? 'text-white/50 group-hover:text-white' : 'text-slate-300 group-hover:text-emerald-600'} transition-colors`} size={24}/>
                             </div>
 
                             <div className="flex gap-6 h-full">
                                 {/* Left: Progress */}
                                 <div className="flex-1 space-y-4">
-                                     <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
+                                     <div className={`rounded-xl p-3 border ${getCardInnerBg(theme.salesColor)}`}>
                                         <div className="flex justify-between text-sm mb-1">
-                                            <span className="text-slate-500">Q4 交付目标</span>
+                                            <span className={`${isDark(theme.salesColor) ? 'text-white/70' : 'text-slate-500'}`}>Q4 交付目标</span>
                                             <span className="font-bold text-emerald-600">82%</span>
                                         </div>
-                                        <div className="w-full bg-slate-200 rounded-full h-2">
+                                        <div className={`w-full rounded-full h-2 ${isDark(theme.salesColor) ? 'bg-black/20' : 'bg-slate-200'}`}>
                                             <div className="h-full bg-emerald-500 rounded-full w-[82%]"></div>
                                         </div>
                                      </div>
                                      <div className="flex justify-between items-center px-2">
                                          <div className="text-center">
-                                             <div className="text-xs text-slate-400">本月订单</div>
-                                             <div className="font-bold text-lg text-slate-800">12.4GWh</div>
+                                             <div className={`text-xs ${isDark(theme.salesColor) ? 'text-white/50' : 'text-slate-400'}`}>本月订单</div>
+                                             <div className={`font-bold text-lg ${getTextColor(theme.salesColor)}`}>12.4GWh</div>
                                          </div>
-                                         <div className="h-8 w-px bg-slate-200"></div>
+                                         <div className={`h-8 w-px ${isDark(theme.salesColor) ? 'bg-white/20' : 'bg-slate-200'}`}></div>
                                          <div className="text-center">
-                                             <div className="text-xs text-slate-400">预测偏差</div>
+                                             <div className={`text-xs ${isDark(theme.salesColor) ? 'text-white/50' : 'text-slate-400'}`}>预测偏差</div>
                                              <div className="font-bold text-lg text-emerald-600">3.2%</div>
                                          </div>
                                      </div>
                                 </div>
 
                                 {/* Right: Specific Delayed Orders */}
-                                <div className="flex-1 border-l border-slate-100 pl-6 flex flex-col justify-center">
-                                    <div className="text-xs font-bold text-slate-400 uppercase mb-3 flex items-center gap-1">
+                                <div className={`flex-1 border-l pl-6 flex flex-col justify-center ${isDark(theme.salesColor) ? 'border-white/10' : 'border-slate-100'}`}>
+                                    <div className={`text-xs font-bold uppercase mb-3 flex items-center gap-1 ${isDark(theme.salesColor) ? 'text-white/50' : 'text-slate-400'}`}>
                                         <Clock size={12}/> 交付风险订单
                                     </div>
                                     <div className="space-y-2">
-                                        <div className="flex items-center gap-3 text-sm group-hover:bg-slate-50 p-2 rounded transition-colors -ml-2">
+                                        <div className={`flex items-center gap-3 text-sm p-2 rounded transition-colors -ml-2 ${isDark(theme.salesColor) ? 'group-hover:bg-white/10' : 'group-hover:bg-slate-50'}`}>
                                             <div className="w-1.5 h-1.5 rounded-full bg-red-500"></div>
                                             <div className="flex-1">
-                                                <div className="font-bold text-slate-700">小鹏 (XP-590)</div>
-                                                <div className="text-xs text-slate-400">12,000 Packs</div>
+                                                <div className={`font-bold ${getTextColor(theme.salesColor)}`}>小鹏 (XP-590)</div>
+                                                <div className={`text-xs ${getSubTextColor(theme.salesColor)}`}>12,000 Packs</div>
                                             </div>
                                             <div className="text-xs font-bold text-red-600 bg-red-50 px-2 py-1 rounded">延期3天</div>
                                         </div>
-                                        <div className="flex items-center gap-3 text-sm group-hover:bg-slate-50 p-2 rounded transition-colors -ml-2">
+                                        <div className={`flex items-center gap-3 text-sm p-2 rounded transition-colors -ml-2 ${isDark(theme.salesColor) ? 'group-hover:bg-white/10' : 'group-hover:bg-slate-50'}`}>
                                             <div className="w-1.5 h-1.5 rounded-full bg-amber-500"></div>
                                             <div className="flex-1">
-                                                <div className="font-bold text-slate-700">广汽 (Y76)</div>
-                                                <div className="text-xs text-slate-400">45,000 Cells</div>
+                                                <div className={`font-bold ${getTextColor(theme.salesColor)}`}>广汽 (Y76)</div>
+                                                <div className={`text-xs ${getSubTextColor(theme.salesColor)}`}>45,000 Cells</div>
                                             </div>
                                             <div className="text-xs font-bold text-amber-600 bg-amber-50 px-2 py-1 rounded">风险</div>
                                         </div>
                                     </div>
                                 </div>
+                            </div>
+                        </div>
+
+                        {/* 6. Capacity: Bottom Right (NEW) */}
+                        <div 
+                             onClick={() => setActiveView('capacity')}
+                             className={`${getGridClasses(theme.layoutMode, 'cap')} ${theme.capacityColor} rounded-[24px] p-6 border shadow-md group cursor-pointer relative transition-all duration-300 ${isDark(theme.capacityColor) ? 'border-transparent' : 'border-slate-100 hover:border-slate-300'}`}
+                        >
+                            <div className="flex justify-between items-start mb-4">
+                                <div className="flex items-center gap-3">
+                                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center border ${isDark(theme.capacityColor) ? 'bg-white/10 border-white/10 text-white' : 'bg-orange-100 text-orange-600 border-orange-200'}`}>
+                                        <BarChart4 size={24}/>
+                                    </div>
+                                    <div>
+                                        <h3 className={`text-xl font-bold ${getTextColor(theme.capacityColor)}`}>12个月产能滚动预测</h3>
+                                        <p className={`text-sm ${getSubTextColor(theme.capacityColor)}`}>Rolling Capacity Plan</p>
+                                    </div>
+                                </div>
+                                <ArrowRight className={`${isDark(theme.capacityColor) ? 'text-white/50 group-hover:text-white' : 'text-slate-300 group-hover:text-orange-600'} transition-colors`} size={24}/>
+                            </div>
+
+                            <div className="h-40 w-full relative">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <ComposedChart data={CAP_FORECAST_MINI}>
+                                        <XAxis dataKey="name" hide/>
+                                        <RechartsTooltip 
+                                            cursor={{fill: isDark(theme.capacityColor) ? 'rgba(255,255,255,0.1)' : '#f8fafc'}} 
+                                            contentStyle={{fontSize: '12px'}}
+                                        />
+                                        <Bar dataKey="demand" radius={[2,2,0,0]} barSize={12}>
+                                            {CAP_FORECAST_MINI.map((entry, index) => (
+                                                <Cell key={`cell-${index}`} fill={entry.demand > entry.capacity ? '#ef4444' : '#cbd5e1'} />
+                                            ))}
+                                        </Bar>
+                                        <Line type="monotone" dataKey="capacity" stroke="#f97316" strokeWidth={2} dot={false} />
+                                    </ComposedChart>
+                                </ResponsiveContainer>
+                                <div className={`absolute top-2 right-2 text-xs font-bold px-2 py-1 rounded ${isDark(theme.capacityColor) ? 'bg-white/20 text-white' : 'bg-red-50 text-red-600'}`}>
+                                    M8 瓶颈预警
+                                </div>
+                            </div>
+                            
+                            <div className={`text-center text-xs font-bold mt-2 opacity-0 group-hover:opacity-100 transition-opacity ${isDark(theme.capacityColor) ? 'text-white/80' : 'text-blue-600'}`}>
+                                点击查看详细工艺分析 &rarr;
                             </div>
                         </div>
 
@@ -758,6 +852,7 @@ function App() {
                     {activeView === 'inventory' && <InventoryPanel />}
                     {activeView === 'sales' && <SalesPanel />}
                     {activeView === 'production' && <ProductionMonitorPanel />}
+                    {activeView === 'capacity' && <CapacityPanel />}
                     {activeView === 'settings' && (
                         <SettingsPanel 
                             currentConfig={llmConfig}

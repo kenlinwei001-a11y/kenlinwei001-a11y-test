@@ -35,6 +35,14 @@ const SupplyChainGraph: React.FC<Props> = ({ data, onNodeHover, onNodeClick, onB
 
     const svg = d3.select(svgRef.current);
     svg.selectAll("*").remove(); 
+    
+    // Add Flow Animation Style
+    svg.append("style").text(`
+        @keyframes flow {
+            0% { stroke-dashoffset: 20; }
+            100% { stroke-dashoffset: 0; }
+        }
+    `);
 
     // Groups
     const g = svg.append("g");
@@ -117,10 +125,14 @@ const SupplyChainGraph: React.FC<Props> = ({ data, onNodeHover, onNodeClick, onB
       .enter()
       .append("path")
       .attr("stroke", (d: any) => d.status === 'critical' ? '#ef4444' : d.status === 'warning' ? '#f59e0b' : '#94a3b8')
-      .attr("stroke-opacity", (d: any) => d.status !== 'normal' ? 0.9 : 0.3 + (linkWidthScale(d.value) / 10))
+      .attr("stroke-opacity", (d: any) => d.status !== 'normal' ? 0.9 : 0.6) // Increased base opacity
       .attr("stroke-width", (d: any) => d.status !== 'normal' ? 3 : linkWidthScale(d.value))
       .attr("fill", "none")
-      .attr("marker-end", (d: any) => d.status === 'critical' ? "url(#arrow-critical)" : null);
+      .attr("marker-end", (d: any) => d.status === 'critical' ? "url(#arrow-critical)" : null)
+      // Flow Animation Properties
+      .attr("stroke-dasharray", "8, 6") // Dash, Gap
+      .style("animation", "flow 5s linear infinite") // 5s Cycle
+      .style("animation-delay", () => `-${Math.random() * 5}s`); // Random start offset (negative delay starts immediately at that point)
 
     // Nodes
     const node = g.append("g")
@@ -331,12 +343,12 @@ const SupplyChainGraph: React.FC<Props> = ({ data, onNodeHover, onNodeClick, onB
         <div className="absolute top-4 right-4 z-10 bg-white/90 backdrop-blur border border-slate-200 p-3 rounded shadow-sm text-xs text-slate-600 space-y-2 pointer-events-none select-none">
             <div className="font-bold border-b border-slate-100 pb-1 mb-1">图例说明</div>
             <div className="flex items-center gap-2">
-                <div className="w-6 h-[2px] bg-slate-400 opacity-40"></div>
-                <span>普通流量</span>
+                <div className="w-6 h-[2px] border-b-2 border-slate-400 border-dashed opacity-60"></div>
+                <span>动态物流</span>
             </div>
              <div className="flex items-center gap-2">
                 <div className="w-6 h-[6px] bg-slate-400 opacity-80"></div>
-                <span>高频/大宗供货</span>
+                <span>大宗供货</span>
             </div>
              <div className="flex items-center gap-2">
                 <div className="w-10 h-4 rounded-full border border-slate-300 bg-slate-50 flex items-center justify-center text-[10px] font-bold text-slate-500">2.5k</div>
