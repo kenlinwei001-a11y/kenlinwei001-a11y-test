@@ -15,6 +15,12 @@ const SupplyChainGraph: React.FC<Props> = ({ data, onNodeHover, width, height })
   useEffect(() => {
     if (!svgRef.current || !data.nodes.length) return;
 
+    // CRITICAL FIX: Deep clone data to prevent D3 from mutating the original props/state.
+    // D3 replaces string IDs in 'links' with object references. If we reuse mutated data
+    // in subsequent renders (React StrictMode), D3 crashes or links disappear.
+    const simulationNodes = JSON.parse(JSON.stringify(data.nodes));
+    const simulationLinks = JSON.parse(JSON.stringify(data.links));
+
     const svg = d3.select(svgRef.current);
     svg.selectAll("*").remove(); // Clear previous render
 
@@ -38,8 +44,8 @@ const SupplyChainGraph: React.FC<Props> = ({ data, onNodeHover, width, height })
 
 
     // Force Simulation Setup
-    const simulation = d3.forceSimulation(data.nodes as d3.SimulationNodeDatum[])
-      .force("link", d3.forceLink(data.links).id((d: any) => d.id).distance(180)) // Increased distance slightly
+    const simulation = d3.forceSimulation(simulationNodes as d3.SimulationNodeDatum[])
+      .force("link", d3.forceLink(simulationLinks).id((d: any) => d.id).distance(180)) // Increased distance slightly
       .force("charge", d3.forceManyBody().strength(-500))
       .force("collide", d3.forceCollide(60)) // Avoid overlap with new badges
       .force("x", d3.forceX((d: any) => {
@@ -87,27 +93,27 @@ const SupplyChainGraph: React.FC<Props> = ({ data, onNodeHover, width, height })
     // Links (Curves)
     const link = g.append("g")
       .selectAll("path")
-      .data(data.links)
+      .data(simulationLinks)
       .enter()
       .append("path")
-      .attr("stroke", (d) => d.status === 'critical' ? '#ef4444' : d.status === 'warning' ? '#f59e0b' : '#94a3b8')
-      .attr("stroke-opacity", (d) => {
+      .attr("stroke", (d: any) => d.status === 'critical' ? '#ef4444' : d.status === 'warning' ? '#f59e0b' : '#94a3b8')
+      .attr("stroke-opacity", (d: any) => {
           if (d.status !== 'normal') return 0.9;
           // Heatmap effect: thicker lines slightly more opaque
           return 0.3 + (linkWidthScale(d.value) / 10); 
       })
-      .attr("stroke-width", (d) => {
+      .attr("stroke-width", (d: any) => {
           // If critical, use a fixed visible width. If normal, use traffic volume.
           if (d.status !== 'normal') return 3;
           return linkWidthScale(d.value);
       })
       .attr("fill", "none")
-      .attr("marker-end", (d) => d.status === 'critical' ? "url(#arrow-critical)" : null);
+      .attr("marker-end", (d: any) => d.status === 'critical' ? "url(#arrow-critical)" : null);
 
     // Nodes
     const node = g.append("g")
       .selectAll("g")
-      .data(data.nodes)
+      .data(simulationNodes)
       .enter()
       .append("g")
       .attr("cursor", "pointer")
@@ -228,14 +234,14 @@ const SupplyChainGraph: React.FC<Props> = ({ data, onNodeHover, width, height })
     });
 
     // Interaction Events
-    node.on("mouseenter", function(event, d) {
+    node.on("mouseenter", function(event, d: any) {
       // Highlight Logic
       const connectedLinkIds = new Set();
       const connectedNodeIds = new Set();
       connectedNodeIds.add(d.id);
 
       // Find connections
-      data.links.forEach((l: any) => {
+      simulationLinks.forEach((l: any) => {
         if (l.source.id === d.id) {
           connectedLinkIds.add(l.index);
           connectedNodeIds.add(l.target.id);
@@ -255,12 +261,14 @@ const SupplyChainGraph: React.FC<Props> = ({ data, onNodeHover, width, height })
         d3.select(this).attr("transform", `translate(${d.x},${d.y}) scale(1.2)`);
       }
 
-      onNodeHover(d, event.clientX, event.clientY);
+      // IMPORTANT: Find the original node data to pass back, since d is the simulation clone
+      const originalNode = data.nodes.find(n => n.id === d.id) || d;
+      onNodeHover(originalNode, event.clientX, event.clientY);
 
-    }).on("mouseleave", function(event, d) {
+    }).on("mouseleave", function(event, d: any) {
       // Reset
       node.style("opacity", 1);
-      link.style("stroke-opacity", (l) => {
+      link.style("stroke-opacity", (l: any) => {
          // Restore heatmap opacity
          if (l.status !== 'normal') return 0.9;
          return 0.3 + (linkWidthScale(l.value) / 10);

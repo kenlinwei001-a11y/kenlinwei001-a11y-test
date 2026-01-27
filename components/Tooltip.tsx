@@ -7,9 +7,11 @@ interface TooltipProps {
   node: NodeData | null;
   position: { x: number; y: number } | null;
   onDrillDown?: (node: NodeData) => void;
+  onMouseEnter?: () => void;
+  onMouseLeave?: () => void;
 }
 
-const Tooltip: React.FC<TooltipProps> = ({ node, position, onDrillDown }) => {
+const Tooltip: React.FC<TooltipProps> = ({ node, position, onDrillDown, onMouseEnter, onMouseLeave }) => {
   if (!node || !position) return null;
 
   const handleDrillDownClick = (e: React.MouseEvent) => {
@@ -223,6 +225,8 @@ const Tooltip: React.FC<TooltipProps> = ({ node, position, onDrillDown }) => {
         opacity: node ? 1 : 0,
         pointerEvents: node ? 'auto' : 'none' // Crucial change: Allow pointer events when visible
       }}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
     >
       {/* Header */}
       <div 

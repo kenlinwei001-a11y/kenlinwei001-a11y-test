@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Layers, Database, Activity, Share2, Menu } from 'lucide-react';
 import { GoogleGenAI, Type } from "@google/genai";
 import SupplyChainGraph from './components/SupplyChainGraph';
@@ -16,6 +16,8 @@ function App() {
   const [selectedAnomalyNode, setSelectedAnomalyNode] = useState<NodeData | null>(null);
   const [dimensions, setDimensions] = useState({ width: window.innerWidth - 680, height: window.innerHeight - 60 });
   
+  const tooltipTimeoutRef = useRef<any>(null);
+
   // Chat State moved to App to allow injection of Simulation Reports
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
@@ -37,6 +39,15 @@ function App() {
     };
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Cleanup timeout
+  useEffect(() => {
+    return () => {
+      if (tooltipTimeoutRef.current) {
+        clearTimeout(tooltipTimeoutRef.current);
+      }
+    };
   }, []);
 
   // Standard Chat Interaction with Rule Learning Tool
@@ -358,11 +369,39 @@ function App() {
   };
 
   const onNodeHover = useCallback((node: NodeData | null, x: number, y: number) => {
-    setHoveredNode({ node, x, y });
+    if (node) {
+        // Clear any existing timeout immediately when entering a new node
+        if (tooltipTimeoutRef.current) {
+            clearTimeout(tooltipTimeoutRef.current);
+            tooltipTimeoutRef.current = null;
+        }
+        setHoveredNode({ node, x, y });
+    } else {
+        // Set a timeout to clear the node after 5 seconds
+        if (tooltipTimeoutRef.current) clearTimeout(tooltipTimeoutRef.current);
+        tooltipTimeoutRef.current = setTimeout(() => {
+            setHoveredNode(prev => ({ ...prev, node: null }));
+        }, 5000);
+    }
   }, []);
 
   const handleDrillDown = useCallback((node: NodeData) => {
     setSelectedAnomalyNode(node);
+  }, []);
+
+  // Handlers for Tooltip interaction
+  const onTooltipEnter = useCallback(() => {
+    if (tooltipTimeoutRef.current) {
+        clearTimeout(tooltipTimeoutRef.current);
+        tooltipTimeoutRef.current = null;
+    }
+  }, []);
+
+  const onTooltipLeave = useCallback(() => {
+    if (tooltipTimeoutRef.current) clearTimeout(tooltipTimeoutRef.current);
+    tooltipTimeoutRef.current = setTimeout(() => {
+        setHoveredNode(prev => ({ ...prev, node: null }));
+    }, 5000);
   }, []);
 
   return (
@@ -452,6 +491,8 @@ function App() {
              node={hoveredNode.node} 
              position={hoveredNode.node ? { x: hoveredNode.x, y: hoveredNode.y } : null} 
              onDrillDown={handleDrillDown}
+             onMouseEnter={onTooltipEnter}
+             onMouseLeave={onTooltipLeave}
            />
         </div>
 
@@ -471,6 +512,7 @@ function App() {
           node={selectedAnomalyNode} 
           graph={graphData} 
           onClose={() => setSelectedAnomalyNode(null)} 
+          onAddConstraint={handleAddConstraint}
         />
       )}
     </div>

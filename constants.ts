@@ -210,23 +210,29 @@ const generateMockData = (): GraphData => {
     });
   });
 
-  // Bases -> Customers
+  // Bases -> Customers (Explicit Logic)
   nodes.filter(n => n.type === NodeType.BASE).forEach((base, i) => {
-    let targetIndices = [];
-    if (i === 0 || i === 1) {
-        targetIndices = [0, 2];
-    } else {
-        targetIndices = [(i) % 5, (i + 2) % 5];
-    }
+    // Distribute bases to customers in a round-robin + overlap fashion to ensure connectivity
+    // 10 bases, 5 customers. 
+    // i=0 -> cust 0, 1
+    // i=1 -> cust 1, 2
+    // ...
+    const custIndex1 = i % 5;
+    const custIndex2 = (i + 1) % 5;
+    
+    // Add extra random connection for density for first few bases
+    const targets = [custIndex1, custIndex2];
+    if (i < 3) targets.push((i + 3) % 5);
 
-    targetIndices.forEach(custIndex => {
+    targets.forEach(custIndex => {
       const custNode = nodes.find(n => n.id === `cust-${custIndex}`);
       if (custNode && custNode.supplyingBases) {
-          custNode.supplyingBases.push(base.name);
+          // Avoid duplicates in the supplying bases list text
+          if (!custNode.supplyingBases.includes(base.name)) {
+              custNode.supplyingBases.push(base.name);
+          }
       }
 
-      // Simulate Pack Delivery Volume (e.g., Sets/Month)
-      // Some links are high volume main supply lines, others are backup
       const isMainRoute = Math.random() > 0.6;
       const flowVolume = isMainRoute ? Math.floor(Math.random() * 3000) + 2000 : Math.floor(Math.random() * 1000) + 500;
       
