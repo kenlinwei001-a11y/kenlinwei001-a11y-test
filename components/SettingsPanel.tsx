@@ -1,7 +1,13 @@
 
 import React, { useState, useEffect } from 'react';
-import { Save, Server, Upload, FileJson, AlertCircle, CheckCircle2, Bot, Database, Plug, RefreshCw, Table, ArrowRightLeft, Check, X, Globe, Lock, Play, Layers, Activity, Link as LinkIcon } from 'lucide-react';
-import { LLMConfig, DataSourceConfig, DataPipelineConfig, DataSourceType } from '../types';
+import { 
+  Save, Server, Upload, Bot, Database, Globe, Lock, Box, Cuboid, Plus, 
+  Settings, Share2, Layout, Cpu, BrainCircuit, Wrench, BookOpen, Code2, 
+  Search, ArrowLeft, ArrowRight, Check, Trash2, FileText, FileSpreadsheet, 
+  AlertCircle, CheckCircle2, RefreshCw, Zap, Link as LinkIcon, Variable, 
+  ChevronRight, Sparkles, Terminal, FileType, GitFork, Layers, Plug, Activity 
+} from 'lucide-react';
+import { LLMConfig, DataSourceConfig, DataPipelineConfig, ObjectTypeDef, AISkill } from '../types';
 
 interface Props {
   currentConfig: LLMConfig;
@@ -9,502 +15,539 @@ interface Props {
   onDataImport: (type: 'graph' | 'inventory' | 'orders' | 'production', data: any) => void;
 }
 
-// Initial Mock Connectors
-const INITIAL_CONNECTORS: DataSourceConfig[] = [
-    { id: 'conn-1', name: 'SAP S/4HANA (Global)', type: 'SAP', endpoint: 'https://api.sap.corp/erp/v1', authType: 'OAUTH2', status: 'connected', lastSync: '10 mins ago' },
-    { id: 'conn-2', name: 'Siemens Opcenter (Jintan)', type: 'MES', endpoint: 'wss://mes-cn-jintan.factory.local', authType: 'API_KEY', status: 'connected', lastSync: 'Live' },
-    { id: 'conn-3', name: 'Salesforce CRM', type: 'CRM', endpoint: 'https://na1.salesforce.com', authType: 'OAUTH2', status: 'error', lastSync: '2 days ago' },
+// --- MOCK DATA (本地模拟数据) ---
+const MOCK_OBJECTS: ObjectTypeDef[] = [
+    { 
+        id: 'obj_order', name: '生产订单 (ProductionOrder)', icon: 'FileText', properties: [], 
+        actions: [
+            { id: 'act_reschedule', name: '调整排期', description: '修改订单交付日期', parameters: [], type: 'Update' },
+            { id: 'act_split', name: '拆分工单', description: '按比例拆分生产批次', parameters: [], type: 'TriggerWorkflow' }
+        ] 
+    },
+    { 
+        id: 'obj_inventory', name: '物料库存 (Inventory)', icon: 'Box', properties: [], 
+        actions: [
+            { id: 'act_transfer', name: '库存调拨', description: '跨基地调货', parameters: [], type: 'Update' },
+            { id: 'act_po', name: '创建采购单', description: '触发紧急采购流程', parameters: [], type: 'Create' }
+        ] 
+    },
+    { 
+        id: 'obj_line', name: '产线设备 (Equipment)', icon: 'Server', properties: [], 
+        actions: [
+            { id: 'act_maint', name: '安排维保', description: '创建维修工单', parameters: [], type: 'TriggerWorkflow' }
+        ] 
+    }
 ];
 
-// Initial Mock Pipelines
-const INITIAL_PIPELINES: DataPipelineConfig[] = [
-    { id: 'pipe-1', name: '每日库存快照同步', sourceId: 'conn-1', targetEntity: 'Inventory', syncFrequency: 'daily', aggregationLogic: 'SELECT SUM(qty) GROUP BY plant_id', active: true },
-    { id: 'pipe-2', name: '产线 OEE 实时流', sourceId: 'conn-2', targetEntity: 'Production', syncFrequency: 'realtime', aggregationLogic: 'STREAM WHERE machine_state CHANGE', active: true },
+const INITIAL_SKILLS: AISkill[] = [
+    { id: 'skill-001', name: '库存水位穿透分析', description: '查询特定物料在全网基地的实时库存，并计算周转天数。', isEnabled: true, linkedActionId: '' },
+    { id: 'skill-002', name: '订单智能重排', description: '当检测到产能冲突时，自动建议最优的订单排期调整方案。', isEnabled: true, linkedActionId: 'act_reschedule' },
+    { id: 'skill-003', name: '供应链风险预演', description: '基于图谱拓扑结构，模拟上游断供对交付的影响范围。', isEnabled: false, linkedActionId: '' },
 ];
 
 const SettingsPanel: React.FC<Props> = ({ currentConfig, onConfigSave, onDataImport }) => {
-  const [activeTab, setActiveTab] = useState<'model' | 'connectors' | 'logic' | 'manual'>('connectors');
+  // Navigation State
+  const [activeTab, setActiveTab] = useState<'connectors' | 'ontology' | 'intelligence' | 'model' | 'manual'>('ontology');
   
-  // Model Config State
+  // Intelligence Sub-View State
+  const [intelView, setIntelView] = useState<'menu' | 'skills_list' | 'skills_detail' | 'knowledge' | 'prompt'>('menu');
+  
+  // Data State
   const [config, setConfig] = useState<LLMConfig>(currentConfig);
+  const [skills, setSkills] = useState<AISkill[]>(INITIAL_SKILLS);
+  const [selectedSkill, setSelectedSkill] = useState<AISkill | null>(null);
   const [showSaved, setShowSaved] = useState(false);
 
-  // Integration State
-  const [connectors, setConnectors] = useState<DataSourceConfig[]>(INITIAL_CONNECTORS);
-  const [pipelines, setPipelines] = useState<DataPipelineConfig[]>(INITIAL_PIPELINES);
-  const [isSyncing, setIsSyncing] = useState<string | null>(null); // Pipeline ID currently syncing
+  useEffect(() => { setConfig(currentConfig); }, [currentConfig]);
 
-  // Data Import State
-  const [importStatus, setImportStatus] = useState<{[key: string]: string}>({});
-  
-  // New Connector Form State
-  const [showAddConnector, setShowAddConnector] = useState(false);
-  const [newConnector, setNewConnector] = useState<Partial<DataSourceConfig>>({ type: 'SAP', authType: 'API_KEY' });
-
-  useEffect(() => {
-    setConfig(currentConfig);
-  }, [currentConfig]);
-
+  // Handlers
   const handleSaveConfig = () => {
     onConfigSave(config);
     setShowSaved(true);
     setTimeout(() => setShowSaved(false), 2000);
   };
 
-  const handleFileUpload = (type: 'graph' | 'inventory' | 'orders' | 'production', e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, type: string) => {
+      // Simulation only
+      alert(`已开始解析文件并导入 ${type} 数据...`);
+  };
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      try {
-        const json = JSON.parse(event.target?.result as string);
-        onDataImport(type, json);
-        setImportStatus(prev => ({...prev, [type]: `成功导入: ${file.name}`}));
-      } catch (err) {
-        setImportStatus(prev => ({...prev, [type]: '导入失败: 格式错误'}));
-        console.error(err);
+  const updateSkill = (updated: AISkill) => {
+      setSkills(prev => prev.map(s => s.id === updated.id ? updated : s));
+      setSelectedSkill(updated);
+  };
+
+  // --- RENDER HELPERS ---
+
+  // 1. 系统集成 (Connectors)
+  const renderConnectors = () => (
+      <div className="space-y-4 animate-in fade-in slide-in-from-right-4">
+          <div className="bg-blue-50 border border-blue-100 p-3 rounded-lg flex items-start gap-2">
+              <Plug className="text-blue-600 mt-0.5 shrink-0" size={16} />
+              <div className="text-xs text-blue-800">
+                  <p className="font-bold mb-1">多源异构数据集成</p>
+                  已配置 3 个核心业务系统连接器。数据同步策略：实时(MES) / T+1(ERP)。
+              </div>
+          </div>
+          
+          <div className="space-y-3">
+              {[
+                  { name: 'SAP S/4HANA (Global)', type: 'ERP', status: 'active', sync: '10分钟前' },
+                  { name: 'Siemens Opcenter', type: 'MES', status: 'active', sync: '实时' },
+                  { name: 'Salesforce CRM', type: 'CRM', status: 'error', sync: '2天前' },
+              ].map((conn, i) => (
+                  <div key={i} className="bg-white border border-slate-200 rounded-xl p-4 flex items-center justify-between shadow-sm hover:border-indigo-300 transition-colors cursor-pointer group">
+                      <div className="flex items-center gap-3">
+                          <div className={`w-10 h-10 rounded-lg flex items-center justify-center font-bold text-xs text-white ${conn.type === 'ERP' ? 'bg-[#0a2540]' : conn.type === 'MES' ? 'bg-orange-600' : 'bg-blue-500'}`}>
+                              {conn.type}
+                          </div>
+                          <div>
+                              <div className="font-bold text-slate-700 text-sm group-hover:text-indigo-600 transition-colors">{conn.name}</div>
+                              <div className="text-[10px] text-slate-400 flex items-center gap-1">
+                                  <Lock size={10}/> OAuth 2.0 • {conn.sync}
+                              </div>
+                          </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                          <span className={`w-2 h-2 rounded-full ${conn.status === 'active' ? 'bg-emerald-500' : 'bg-red-500'}`}></span>
+                          <ChevronRight size={16} className="text-slate-300"/>
+                      </div>
+                  </div>
+              ))}
+              <button className="w-full py-3 border-2 border-dashed border-slate-300 rounded-xl text-slate-400 text-xs font-bold hover:bg-slate-50 hover:border-slate-400 flex items-center justify-center gap-2 transition-all">
+                  <Plus size={16}/> 新建数据连接
+              </button>
+          </div>
+      </div>
+  );
+
+  // 2. 业务本体 (Ontology)
+  const renderOntology = () => (
+      <div className="space-y-6 animate-in fade-in slide-in-from-right-4">
+          <div className="bg-slate-50 border border-slate-200 p-4 rounded-xl text-center space-y-3">
+             <div className="mx-auto w-12 h-12 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600">
+                 <Cuboid size={24}/>
+             </div>
+             <div>
+                 <h3 className="text-sm font-bold text-slate-800">业务对象建模</h3>
+                 <p className="text-xs text-slate-500 mt-1">定义实体、属性及其关系，构建数字孪生语义层。</p>
+             </div>
+          </div>
+          
+          <div>
+              <h4 className="text-xs font-bold text-slate-500 uppercase mb-3 flex items-center gap-2">已定义对象 ({MOCK_OBJECTS.length})</h4>
+              <div className="grid gap-2">
+                  {MOCK_OBJECTS.map(obj => (
+                      <div key={obj.id} className="p-3 bg-white border border-slate-200 rounded-lg flex items-center justify-between hover:shadow-sm">
+                          <div className="flex items-center gap-3">
+                              <Box size={16} className="text-slate-400"/>
+                              <span className="text-sm font-bold text-slate-700">{obj.name}</span>
+                          </div>
+                          <span className="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">
+                              {obj.actions.length} 个动作
+                          </span>
+                      </div>
+                  ))}
+              </div>
+          </div>
+          <div className="text-center">
+             <button className="text-xs text-indigo-600 font-bold hover:underline flex items-center justify-center gap-1">
+                 进入本体编辑器 <ArrowRight size={12}/>
+             </button>
+          </div>
+      </div>
+  );
+
+  // 3. 智能体编排 (Intelligence) - Sub-views
+  const renderIntelligence = () => {
+      // --- MENU VIEW ---
+      if (intelView === 'menu') {
+          return (
+              <div className="h-full flex flex-col gap-4 animate-in zoom-in-95 duration-300">
+                  <div className="bg-gradient-to-br from-indigo-600 to-purple-700 rounded-xl p-5 text-white shadow-lg">
+                      <div className="flex items-center gap-3 mb-2">
+                          <BrainCircuit size={24} className="text-indigo-200"/>
+                          <h3 className="text-lg font-bold">智能中枢 (AIP)</h3>
+                      </div>
+                      <p className="text-xs text-indigo-100 leading-relaxed opacity-90">
+                          配置 AI 智能体的认知能力与执行边界。通过编排技能、注入知识库和设定提示词，打造企业级决策助手。
+                      </p>
+                  </div>
+
+                  <div className="grid gap-4">
+                      {/* Skill Registry Card */}
+                      <div 
+                        onClick={() => setIntelView('skills_list')}
+                        className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow-md hover:border-purple-300 cursor-pointer transition-all group flex items-start gap-4"
+                      >
+                          <div className="w-10 h-10 bg-purple-50 text-purple-600 rounded-lg flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                              <Wrench size={20}/>
+                          </div>
+                          <div className="flex-1">
+                              <div className="flex justify-between items-center mb-1">
+                                  <h4 className="font-bold text-slate-800 group-hover:text-purple-700">技能注册中心</h4>
+                                  <ChevronRight size={16} className="text-slate-300 group-hover:text-purple-500"/>
+                              </div>
+                              <p className="text-xs text-slate-500 leading-tight">注册 AI 可调用的工具函数，并将其映射到本体动作(Actions)。</p>
+                          </div>
+                      </div>
+
+                      {/* Knowledge Base Card */}
+                      <div 
+                        onClick={() => setIntelView('knowledge')}
+                        className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow-md hover:border-blue-300 cursor-pointer transition-all group flex items-start gap-4"
+                      >
+                          <div className="w-10 h-10 bg-blue-50 text-blue-600 rounded-lg flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                              <BookOpen size={20}/>
+                          </div>
+                          <div className="flex-1">
+                              <div className="flex justify-between items-center mb-1">
+                                  <h4 className="font-bold text-slate-800 group-hover:text-blue-700">知识图谱映射</h4>
+                                  <ChevronRight size={16} className="text-slate-300 group-hover:text-blue-500"/>
+                              </div>
+                              <p className="text-xs text-slate-500 leading-tight">上传企业SOP、历史案例库，构建垂直领域 RAG 检索增强。</p>
+                          </div>
+                      </div>
+
+                      {/* Prompt Card */}
+                      <div 
+                        onClick={() => setIntelView('prompt')}
+                        className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow-md hover:border-emerald-300 cursor-pointer transition-all group flex items-start gap-4"
+                      >
+                          <div className="w-10 h-10 bg-emerald-50 text-emerald-600 rounded-lg flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                              <Code2 size={20}/>
+                          </div>
+                          <div className="flex-1">
+                              <div className="flex justify-between items-center mb-1">
+                                  <h4 className="font-bold text-slate-800 group-hover:text-emerald-700">系统提示词</h4>
+                                  <ChevronRight size={16} className="text-slate-300 group-hover:text-emerald-500"/>
+                              </div>
+                              <p className="text-xs text-slate-500 leading-tight">定义智能体的角色人设、思维链(CoT)逻辑及输出规范。</p>
+                          </div>
+                      </div>
+                  </div>
+              </div>
+          );
       }
-    };
-    reader.readAsText(file);
-    e.target.value = '';
+
+      // --- SKILLS LIST VIEW ---
+      if (intelView === 'skills_list') {
+          return (
+              <div className="h-full flex flex-col animate-in slide-in-from-right-8">
+                  <div className="flex items-center gap-2 mb-4 pb-2 border-b border-slate-100">
+                      <button onClick={() => setIntelView('menu')} className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-500"><ArrowLeft size={16}/></button>
+                      <h3 className="font-bold text-slate-800">技能注册中心</h3>
+                      <span className="text-xs text-slate-400 ml-auto">{skills.length} 个技能</span>
+                  </div>
+                  
+                  <div className="flex-1 overflow-y-auto space-y-3">
+                      {skills.map(skill => (
+                          <div 
+                            key={skill.id}
+                            onClick={() => { setSelectedSkill(skill); setIntelView('skills_detail'); }}
+                            className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:border-purple-300 hover:shadow-md cursor-pointer transition-all"
+                          >
+                              <div className="flex justify-between items-start mb-2">
+                                  <div className="font-bold text-sm text-slate-700 flex items-center gap-2">
+                                      {skill.name}
+                                      {skill.linkedActionId && <LinkIcon size={12} className="text-purple-500"/>}
+                                  </div>
+                                  <div className={`w-2 h-2 rounded-full ${skill.isEnabled ? 'bg-emerald-500' : 'bg-slate-300'}`}></div>
+                              </div>
+                              <p className="text-xs text-slate-500 line-clamp-2">{skill.description}</p>
+                          </div>
+                      ))}
+                      <button className="w-full py-3 border-2 border-dashed border-slate-200 rounded-xl text-slate-400 text-xs font-bold hover:bg-slate-50 flex items-center justify-center gap-2">
+                          <Plus size={14}/> 注册新技能
+                      </button>
+                  </div>
+              </div>
+          );
+      }
+
+      // --- SKILL DETAIL VIEW ---
+      if (intelView === 'skills_detail' && selectedSkill) {
+          return (
+              <div className="h-full flex flex-col animate-in slide-in-from-right-8">
+                  <div className="flex items-center gap-2 mb-4 pb-2 border-b border-slate-100">
+                      <button onClick={() => setIntelView('skills_list')} className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-500"><ArrowLeft size={16}/></button>
+                      <h3 className="font-bold text-slate-800">配置技能</h3>
+                  </div>
+
+                  <div className="flex-1 overflow-y-auto space-y-5">
+                      <div>
+                          <label className="block text-xs font-bold text-slate-500 mb-1.5">技能名称</label>
+                          <input 
+                            type="text" 
+                            value={selectedSkill.name}
+                            onChange={(e) => updateSkill({...selectedSkill, name: e.target.value})}
+                            className="w-full text-sm border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-purple-500 outline-none"
+                          />
+                      </div>
+                      
+                      <div>
+                          <label className="block text-xs font-bold text-slate-500 mb-1.5">功能描述</label>
+                          <textarea 
+                            value={selectedSkill.description}
+                            onChange={(e) => updateSkill({...selectedSkill, description: e.target.value})}
+                            className="w-full text-xs border border-slate-300 rounded-lg p-2.5 h-20 resize-none focus:ring-2 focus:ring-purple-500 outline-none"
+                          />
+                      </div>
+
+                      <div className="bg-purple-50 border border-purple-100 rounded-xl p-4 space-y-3">
+                          <div className="flex items-center gap-2 text-purple-800 font-bold text-xs border-b border-purple-100 pb-2">
+                              <LinkIcon size={14}/> 业务语义映射
+                          </div>
+                          <p className="text-[10px] text-purple-600">将此 AI 技能绑定到业务对象的具体执行动作，使智能体具备“写操作”权限。</p>
+                          
+                          <div className="grid grid-cols-1 gap-3">
+                              <div>
+                                  <label className="text-[10px] font-bold text-purple-700 block mb-1">目标对象</label>
+                                  <select className="w-full text-xs border border-purple-200 rounded p-2 bg-white text-slate-700 outline-none">
+                                      <option value="">选择业务对象...</option>
+                                      {MOCK_OBJECTS.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
+                                  </select>
+                              </div>
+                              <div>
+                                  <label className="text-[10px] font-bold text-purple-700 block mb-1">执行动作</label>
+                                  <select 
+                                    className="w-full text-xs border border-purple-200 rounded p-2 bg-white text-slate-700 outline-none"
+                                    value={selectedSkill.linkedActionId || ''}
+                                    onChange={(e) => updateSkill({...selectedSkill, linkedActionId: e.target.value})}
+                                  >
+                                      <option value="">(无绑定 - 仅推理)</option>
+                                      {MOCK_OBJECTS.flatMap(o => o.actions).map(a => (
+                                          <option key={a.id} value={a.id}>{a.name}</option>
+                                      ))}
+                                  </select>
+                              </div>
+                          </div>
+                      </div>
+
+                      <div className="flex items-center justify-between pt-2">
+                          <span className="text-xs font-bold text-slate-600">启用此技能</span>
+                          <div 
+                            onClick={() => updateSkill({...selectedSkill, isEnabled: !selectedSkill.isEnabled})}
+                            className={`w-10 h-5 rounded-full relative cursor-pointer transition-colors ${selectedSkill.isEnabled ? 'bg-emerald-500' : 'bg-slate-300'}`}
+                          >
+                              <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-transform ${selectedSkill.isEnabled ? 'left-5.5' : 'left-0.5'}`}></div>
+                          </div>
+                      </div>
+                  </div>
+              </div>
+          );
+      }
+
+      // --- KNOWLEDGE BASE VIEW ---
+      if (intelView === 'knowledge') {
+          return (
+             <div className="h-full flex flex-col animate-in slide-in-from-right-8">
+                  <div className="flex items-center gap-2 mb-4 pb-2 border-b border-slate-100">
+                      <button onClick={() => setIntelView('menu')} className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-500"><ArrowLeft size={16}/></button>
+                      <h3 className="font-bold text-slate-800">知识库配置</h3>
+                  </div>
+
+                  <div className="flex-1 overflow-y-auto">
+                      {/* Upload Area */}
+                      <div className="border-2 border-dashed border-slate-300 bg-slate-50 rounded-xl p-6 flex flex-col items-center justify-center text-center cursor-pointer hover:border-blue-400 hover:bg-blue-50/30 transition-all mb-6 group">
+                          <Upload size={24} className="text-slate-400 group-hover:text-blue-500 mb-2 transition-colors"/>
+                          <p className="text-sm font-bold text-slate-600">点击或拖拽上传文件</p>
+                          <p className="text-[10px] text-slate-400 mt-1">支持 PDF, Word, Excel, Markdown (最大 50MB)</p>
+                      </div>
+
+                      <h4 className="text-xs font-bold text-slate-500 uppercase mb-3 px-1">已索引文档</h4>
+                      <div className="space-y-2">
+                          {[
+                              { name: '2024_Q4_供应链应急预案.pdf', type: 'pdf', status: 'ready', size: '2.4 MB' },
+                              { name: '各基地产能参数表_v3.xlsx', type: 'xls', status: 'processing', size: '800 KB' },
+                              { name: '物流商合同条款.docx', type: 'doc', status: 'ready', size: '1.2 MB' },
+                          ].map((file, i) => (
+                              <div key={i} className="flex items-center justify-between p-3 bg-white border border-slate-200 rounded-lg hover:shadow-sm">
+                                  <div className="flex items-center gap-3">
+                                      <div className={`p-2 rounded-lg ${file.type === 'pdf' ? 'bg-red-50 text-red-600' : file.type === 'xls' ? 'bg-green-50 text-green-600' : 'bg-blue-50 text-blue-600'}`}>
+                                          {file.type === 'pdf' ? <FileText size={16}/> : file.type === 'xls' ? <FileSpreadsheet size={16}/> : <FileText size={16}/>}
+                                      </div>
+                                      <div>
+                                          <div className="text-xs font-bold text-slate-700 truncate max-w-[180px]">{file.name}</div>
+                                          <div className="text-[10px] text-slate-400">{file.size}</div>
+                                      </div>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                      {file.status === 'ready' ? (
+                                          <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full flex items-center gap-1">
+                                              <CheckCircle2 size={10}/> 已就绪
+                                          </span>
+                                      ) : (
+                                          <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full flex items-center gap-1">
+                                              <RefreshCw size={10} className="animate-spin"/> 解析中
+                                          </span>
+                                      )}
+                                      <button className="text-slate-300 hover:text-red-500 p-1"><Trash2 size={14}/></button>
+                                  </div>
+                              </div>
+                          ))}
+                      </div>
+                  </div>
+             </div>
+          );
+      }
+
+      // --- SYSTEM PROMPT VIEW ---
+      if (intelView === 'prompt') {
+          return (
+             <div className="h-full flex flex-col animate-in slide-in-from-right-8">
+                  <div className="flex items-center gap-2 mb-3 pb-2 border-b border-slate-100">
+                      <button onClick={() => setIntelView('menu')} className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-500"><ArrowLeft size={16}/></button>
+                      <h3 className="font-bold text-slate-800">系统提示词工程</h3>
+                  </div>
+
+                  <div className="flex-1 flex gap-4 h-full overflow-hidden">
+                      {/* Editor */}
+                      <div className="flex-1 relative flex flex-col">
+                          <div className="bg-slate-800 text-slate-400 text-[10px] px-3 py-1.5 rounded-t-lg flex items-center justify-between">
+                              <span>system_prompt.md</span>
+                              <Sparkles size={10} className="text-yellow-400"/>
+                          </div>
+                          <textarea 
+                              className="flex-1 w-full bg-slate-900 text-slate-200 p-4 font-mono text-xs leading-relaxed resize-none focus:outline-none rounded-b-lg custom-scrollbar"
+                              defaultValue={`# 角色定义
+你是一家大型锂电池制造企业的供应链专家智能助手。
+你的目标是优化库存水平、生产排期和物流交付。
+
+# 约束条件
+1. 安全优先：永远不要提出违反安全库存限制 (< 2000 Ah) 的计划。
+2. 成本与服务：在物流成本和VIP客户交付之间，优先保障VIP客户。
+
+# 输出格式
+- 使用 Markdown 表格进行数据对比。
+- 总是解释你做出决策背后的推理逻辑。`}
+                          />
+                      </div>
+
+                      {/* Variable Pool Sidebar */}
+                      <div className="w-32 flex flex-col gap-2 shrink-0">
+                          <div className="text-[10px] font-bold text-slate-500 uppercase mb-1 flex items-center gap-1">
+                              <Variable size={12}/> 上下文变量池
+                          </div>
+                          {['inventory_level', 'user_role', 'current_date', 'graph_topology', 'alert_count'].map(v => (
+                              <div key={v} className="bg-slate-100 border border-slate-200 px-2 py-1.5 rounded text-[10px] font-mono text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-200 cursor-pointer transition-colors truncate" title={`点击插入 {{${v}}}`}>
+                                  {`{{${v}}}`}
+                              </div>
+                          ))}
+                      </div>
+                  </div>
+             </div>
+          );
+      }
+      return null;
   };
 
-  const handleTestConnection = (id: string) => {
-      // Mock testing connection
-      const updated = connectors.map(c => {
-          if (c.id === id) return { ...c, status: 'connected' as const };
-          return c;
-      });
-      setConnectors(updated);
-  };
+  // 4. 模型引擎 (Model)
+  const renderModelEngine = () => (
+     <div className="space-y-6 animate-in fade-in slide-in-from-right-4">
+         <div className="bg-slate-50 border border-slate-200 p-4 rounded-xl text-center">
+             <div className="mx-auto w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-600 mb-2">
+                 <Cpu size={24}/>
+             </div>
+             <h3 className="text-sm font-bold text-slate-800">LLM 模型引擎配置</h3>
+         </div>
 
-  const handleRunPipeline = (id: string) => {
-      setIsSyncing(id);
-      setTimeout(() => {
-          setIsSyncing(null);
-      }, 2000);
-  };
-
-  const handleAddConnector = () => {
-      if(!newConnector.name || !newConnector.endpoint) return;
-      setConnectors([...connectors, {
-          id: `conn-${Date.now()}`,
-          name: newConnector.name,
-          type: newConnector.type as DataSourceType,
-          endpoint: newConnector.endpoint,
-          authType: newConnector.authType as any,
-          status: 'disconnected',
-          lastSync: 'Never'
-      }]);
-      setShowAddConnector(false);
-      setNewConnector({ type: 'SAP', authType: 'API_KEY' });
-  };
-
-  return (
-    <div className="flex flex-col h-full bg-slate-50 w-full">
-      {/* Header */}
-      <div className="p-5 border-b border-slate-200 bg-white sticky top-0 z-10">
-        <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-          <Server className="text-slate-600" size={20}/>
-          集成与配置中心
-        </h2>
-        <p className="text-xs text-slate-500 mt-1">Enterprise Integration & System Settings</p>
-      </div>
-
-      {/* Tabs */}
-      <div className="flex border-b border-slate-200 bg-white overflow-x-auto">
-        <button 
-          onClick={() => setActiveTab('connectors')}
-          className={`flex-1 min-w-[100px] py-3 text-xs font-bold flex items-center justify-center gap-2 border-b-2 transition-colors ${activeTab === 'connectors' ? 'border-blue-600 text-blue-600 bg-blue-50/50' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
-        >
-          <Plug size={14}/> 数据连接器
-        </button>
-        <button 
-          onClick={() => setActiveTab('logic')}
-          className={`flex-1 min-w-[100px] py-3 text-xs font-bold flex items-center justify-center gap-2 border-b-2 transition-colors ${activeTab === 'logic' ? 'border-blue-600 text-blue-600 bg-blue-50/50' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
-        >
-          <ArrowRightLeft size={14}/> 数据逻辑编排
-        </button>
-        <button 
-          onClick={() => setActiveTab('model')}
-          className={`flex-1 min-w-[100px] py-3 text-xs font-bold flex items-center justify-center gap-2 border-b-2 transition-colors ${activeTab === 'model' ? 'border-blue-600 text-blue-600 bg-blue-50/50' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
-        >
-          <Bot size={14}/> 大模型配置
-        </button>
-        <button 
-          onClick={() => setActiveTab('manual')}
-          className={`flex-1 min-w-[100px] py-3 text-xs font-bold flex items-center justify-center gap-2 border-b-2 transition-colors ${activeTab === 'manual' ? 'border-blue-600 text-blue-600 bg-blue-50/50' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
-        >
-          <Upload size={14}/> 手动导入
-        </button>
-      </div>
-
-      <div className="flex-1 overflow-y-auto p-6 space-y-6">
-        
-        {/* === TAB 1: CONNECTORS === */}
-        {activeTab === 'connectors' && (
-            <div className="space-y-4 animate-in fade-in slide-in-from-right-4">
-                <div className="flex justify-between items-center">
-                    <h3 className="text-sm font-bold text-slate-700 flex items-center gap-2">
-                        <Globe size={16}/> 外部系统连接 (External Systems)
-                    </h3>
-                    <button 
-                        onClick={() => setShowAddConnector(!showAddConnector)}
-                        className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded text-xs font-bold flex items-center gap-1 transition-colors"
-                    >
-                        {showAddConnector ? <X size={14}/> : <Plug size={14}/>}
-                        {showAddConnector ? '取消' : '新建连接'}
-                    </button>
-                </div>
-
-                {/* Add Connector Form */}
-                {showAddConnector && (
-                    <div className="bg-white border border-indigo-100 p-4 rounded-xl shadow-sm space-y-3 animate-in fade-in slide-in-from-top-2">
-                        <div className="grid grid-cols-2 gap-3">
-                            <div>
-                                <label className="block text-xs font-bold text-slate-500 mb-1">系统名称</label>
-                                <input 
-                                    type="text" 
-                                    className="w-full text-xs border rounded p-2" 
-                                    placeholder="e.g., SAP ERP Global"
-                                    value={newConnector.name || ''}
-                                    onChange={(e) => setNewConnector({...newConnector, name: e.target.value})}
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-xs font-bold text-slate-500 mb-1">系统类型</label>
-                                <select 
-                                    className="w-full text-xs border rounded p-2 bg-white"
-                                    value={newConnector.type}
-                                    onChange={(e) => setNewConnector({...newConnector, type: e.target.value as any})}
-                                >
-                                    <option value="SAP">SAP S/4HANA (ERP)</option>
-                                    <option value="MES">Manufacturing Execution (MES)</option>
-                                    <option value="CRM">CRM / Salesforce</option>
-                                    <option value="WMS">Warehouse Mgmt (WMS)</option>
-                                    <option value="IOT">Industrial IoT Hub</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div>
-                            <label className="block text-xs font-bold text-slate-500 mb-1">API Endpoint / Connection String</label>
-                            <div className="flex items-center gap-2">
-                                <input 
-                                    type="text" 
-                                    className="flex-1 text-xs border rounded p-2 font-mono text-slate-600" 
-                                    placeholder="https://api.gateway.corp..."
-                                    value={newConnector.endpoint || ''}
-                                    onChange={(e) => setNewConnector({...newConnector, endpoint: e.target.value})}
-                                />
-                                <select 
-                                    className="w-24 text-xs border rounded p-2 bg-white"
-                                    value={newConnector.authType}
-                                    onChange={(e) => setNewConnector({...newConnector, authType: e.target.value as any})}
-                                >
-                                    <option value="API_KEY">API Key</option>
-                                    <option value="OAUTH2">OAuth 2.0</option>
-                                    <option value="BASIC">Basic</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div className="pt-2 flex justify-end">
-                             <button 
-                                onClick={handleAddConnector}
-                                className="bg-slate-800 text-white px-4 py-2 rounded text-xs font-bold"
-                             >
-                                 保存并连接
-                             </button>
-                        </div>
-                    </div>
-                )}
-
-                {/* Connector List */}
-                <div className="grid gap-3">
-                    {connectors.map(conn => (
-                        <div key={conn.id} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between group hover:border-blue-300 transition-colors">
-                            <div className="flex items-center gap-3">
-                                <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-white font-bold text-xs shadow-sm
-                                    ${conn.type === 'SAP' ? 'bg-[#00305e]' : 
-                                      conn.type === 'MES' ? 'bg-orange-600' : 
-                                      conn.type === 'CRM' ? 'bg-blue-500' : 'bg-slate-600'}
-                                `}>
-                                    {conn.type}
-                                </div>
-                                <div>
-                                    <div className="font-bold text-slate-700 text-sm">{conn.name}</div>
-                                    <div className="text-[10px] text-slate-400 font-mono flex items-center gap-1">
-                                        <Lock size={10}/> {conn.authType} • {conn.endpoint}
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="flex items-center gap-4">
-                                <div className="text-right">
-                                    <div className={`text-xs font-bold ${conn.status === 'connected' ? 'text-emerald-600' : conn.status === 'error' ? 'text-red-600' : 'text-slate-400'}`}>
-                                        {conn.status === 'connected' ? '● Connected' : conn.status === 'error' ? '● Error' : '○ Disconnected'}
-                                    </div>
-                                    <div className="text-[10px] text-slate-400">Last Sync: {conn.lastSync}</div>
-                                </div>
-                                <button 
-                                    onClick={() => handleTestConnection(conn.id)}
-                                    className="p-2 border border-slate-200 rounded hover:bg-slate-50 text-slate-500 hover:text-blue-600 transition-colors"
-                                    title="Test Connection"
-                                >
-                                    <RefreshCw size={14}/>
-                                </button>
-                            </div>
-                        </div>
+         <div className="space-y-4">
+            <div>
+                <label className="block text-xs font-bold text-slate-500 mb-2">服务提供商 (Provider)</label>
+                <div className="grid grid-cols-3 gap-2">
+                    {(['gemini', 'kimi', 'rendu'] as const).map(p => (
+                        <button
+                            key={p}
+                            onClick={() => setConfig({ ...config, provider: p })}
+                            className={`py-2 text-xs font-bold rounded-lg border transition-all ${
+                                config.provider === p 
+                                ? 'bg-indigo-600 text-white border-indigo-600 shadow-md' 
+                                : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                            }`}
+                        >
+                            {p === 'gemini' ? 'Google Gemini' : p === 'kimi' ? 'Kimi (Moonshot)' : 'Rendu LLM'}
+                        </button>
                     ))}
                 </div>
             </div>
-        )}
 
-        {/* === TAB 2: DATA LOGIC / PIPELINES === */}
-        {activeTab === 'logic' && (
-            <div className="space-y-4 animate-in fade-in slide-in-from-right-4">
-                 <div className="bg-indigo-50 border border-indigo-100 p-3 rounded-lg text-xs text-indigo-800 flex items-start gap-2">
-                   <Layers size={16} className="shrink-0 mt-0.5"/>
-                   <p>在此定义数据聚合逻辑 (ETL)。将原始系统数据映射到数字孪生图谱节点属性，支持 SQL-like 聚合或 JS 表达式。</p>
-                 </div>
-
-                 <div className="space-y-2">
-                     <h3 className="text-sm font-bold text-slate-700">数据同步任务编排 (Active Pipelines)</h3>
-                     <div className="grid gap-3">
-                        {pipelines.map(pipe => {
-                            const sourceName = connectors.find(c => c.id === pipe.sourceId)?.name || 'Unknown Source';
-                            return (
-                                <div key={pipe.id} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-                                    <div className="flex justify-between items-start mb-3">
-                                        <div>
-                                            <h4 className="font-bold text-slate-800 text-sm flex items-center gap-2">
-                                                {pipe.name}
-                                                {pipe.active ? <span className="bg-green-100 text-green-700 text-[9px] px-1.5 py-0.5 rounded-full">Active</span> : <span className="bg-slate-100 text-slate-500 text-[9px] px-1.5 py-0.5 rounded-full">Paused</span>}
-                                            </h4>
-                                            <p className="text-[10px] text-slate-500 mt-0.5 flex items-center gap-1">
-                                                From: <span className="font-semibold text-indigo-600">{sourceName}</span>
-                                                <ArrowRightLeft size={10} />
-                                                To: <span className="font-semibold text-emerald-600">{pipe.targetEntity} Model</span>
-                                            </p>
-                                        </div>
-                                        <button 
-                                            onClick={() => handleRunPipeline(pipe.id)}
-                                            disabled={!!isSyncing}
-                                            className="flex items-center gap-1 px-3 py-1.5 bg-slate-800 text-white rounded text-xs font-bold hover:bg-slate-700 disabled:opacity-50"
-                                        >
-                                            {isSyncing === pipe.id ? (
-                                                <RefreshCw size={12} className="animate-spin"/>
-                                            ) : (
-                                                <Play size={12}/>
-                                            )}
-                                            {isSyncing === pipe.id ? 'Syncing...' : 'Run Now'}
-                                        </button>
-                                    </div>
-                                    
-                                    {/* Logic Visualizer */}
-                                    <div className="bg-slate-50 p-2 rounded border border-slate-200 font-mono text-[10px] text-slate-600 flex items-center gap-2">
-                                        <Activity size={12} className="text-blue-500"/>
-                                        <span className="text-purple-600 font-bold">LOGIC:</span>
-                                        {pipe.aggregationLogic}
-                                    </div>
-                                    <div className="flex justify-between items-center mt-2 text-[10px] text-slate-400">
-                                        <div className="flex gap-4">
-                                            <span>Frequency: <span className="font-semibold text-slate-600">{pipe.syncFrequency}</span></span>
-                                        </div>
-                                    </div>
-                                </div>
-                            );
-                        })}
-                     </div>
-                 </div>
-                 
-                 <button className="w-full py-2 border-2 border-dashed border-slate-300 rounded-lg text-slate-400 text-xs font-bold hover:bg-slate-50 hover:border-slate-400 transition-colors flex items-center justify-center gap-2">
-                     <Plug size={14}/> 添加新的数据映射规则
-                 </button>
-            </div>
-        )}
-
-        {/* === TAB 3: LLM MODEL CONFIG === */}
-        {activeTab === 'model' && (
-          <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-6 animate-in fade-in slide-in-from-right-4">
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-bold text-slate-700 mb-2">选择模型厂商</label>
-                <div className="grid grid-cols-2 gap-3">
-                  <button 
-                    onClick={() => setConfig({...config, provider: 'gemini', modelName: 'gemini-2.5-flash-latest'})}
-                    className={`p-3 rounded-lg border text-left flex items-center gap-3 transition-all ${config.provider === 'gemini' ? 'border-blue-500 bg-blue-50 ring-1 ring-blue-500' : 'border-slate-200 hover:border-slate-300'}`}
-                  >
-                    <div className="w-8 h-8 rounded bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white font-bold text-xs">G</div>
-                    <div>
-                      <div className="text-sm font-bold text-slate-800">Google Gemini</div>
-                      <div className="text-[10px] text-slate-500">推荐: 2.5 Flash</div>
-                    </div>
-                  </button>
-                  <button 
-                    onClick={() => setConfig({...config, provider: 'kimi', modelName: 'moonshot-v1-8k'})}
-                    className={`p-3 rounded-lg border text-left flex items-center gap-3 transition-all ${config.provider === 'kimi' ? 'border-blue-500 bg-blue-50 ring-1 ring-blue-500' : 'border-slate-200 hover:border-slate-300'}`}
-                  >
-                    <div className="w-8 h-8 rounded bg-black flex items-center justify-center text-white font-bold text-xs">K</div>
-                    <div>
-                      <div className="text-sm font-bold text-slate-800">Kimi (Moonshot)</div>
-                      <div className="text-[10px] text-slate-500">OpenAI 兼容接口</div>
-                    </div>
-                  </button>
+            <div>
+                <label className="block text-xs font-bold text-slate-500 mb-2">API 密钥 (Key)</label>
+                <div className="relative">
+                    <input 
+                        type="password" 
+                        value={config.apiKey}
+                        onChange={(e) => setConfig({ ...config, apiKey: e.target.value })}
+                        className="w-full bg-white border border-slate-300 rounded-lg p-2.5 text-xs pl-9 focus:ring-2 focus:ring-indigo-500 outline-none"
+                        placeholder="sk-..."
+                    />
+                    <Lock size={14} className="absolute left-3 top-2.5 text-slate-400"/>
                 </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-bold text-slate-700 mb-1">API Key</label>
-                <input 
-                  type="password" 
-                  value={config.apiKey}
-                  onChange={(e) => setConfig({...config, apiKey: e.target.value})}
-                  placeholder={config.provider === 'gemini' ? "Enter Gemini API Key..." : "sk-..."}
-                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                />
-                <p className="text-[10px] text-slate-500 mt-1">
-                  {config.provider === 'gemini' ? 'Key 将用于调用 Google GenAI SDK' : 'Key 将作为 Bearer Token 发送至接口'}
+                <p className="text-[10px] text-slate-400 mt-1 flex items-center gap-1">
+                    <CheckCircle2 size={10} className="text-emerald-500"/> 密钥仅加密存储于本地浏览器，不上传服务器。
                 </p>
-              </div>
-
-              {config.provider === 'kimi' && (
-                <div>
-                   <label className="block text-sm font-bold text-slate-700 mb-1">Base URL (API 地址)</label>
-                   <input 
-                    type="text" 
-                    value={config.baseUrl || 'https://api.moonshot.cn/v1'}
-                    onChange={(e) => setConfig({...config, baseUrl: e.target.value})}
-                    className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none font-mono text-xs"
-                  />
-                </div>
-              )}
-              
-               <div>
-                   <label className="block text-sm font-bold text-slate-700 mb-1">Model Name</label>
-                   <input 
-                    type="text" 
-                    value={config.modelName || ''}
-                    onChange={(e) => setConfig({...config, modelName: e.target.value})}
-                    className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none font-mono text-xs"
-                  />
-                </div>
             </div>
+         </div>
+     </div>
+  );
 
-            <div className="pt-4 border-t border-slate-100">
-              <button 
-                onClick={handleSaveConfig}
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-lg font-bold text-sm flex items-center justify-center gap-2 transition-all"
-              >
-                {showSaved ? <CheckCircle2 size={16}/> : <Save size={16}/>}
-                {showSaved ? '配置已保存' : '保存配置'}
-              </button>
-            </div>
+  return (
+    <div className="flex flex-col h-full bg-white w-full">
+      {/* Settings Header */}
+      <div className="p-5 border-b border-slate-200 bg-slate-50 shrink-0">
+        <h2 className="font-bold text-slate-800 text-lg flex items-center gap-2">
+          <Server className="text-slate-600" size={20} />
+          系统配置中心
+        </h2>
+        <p className="text-xs text-slate-500 mt-1">全域配置与集成中心</p>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex border-b border-slate-200 bg-white px-2 overflow-x-auto no-scrollbar shrink-0">
+        {[
+            { id: 'ontology', label: '业务定义', icon: Cuboid },
+            { id: 'connectors', label: '系统集成', icon: Plug },
+            { id: 'intelligence', label: '智能中枢', icon: BrainCircuit },
+            { id: 'model', label: '模型引擎', icon: Cpu },
+            { id: 'manual', label: '数据导入', icon: Upload },
+        ].map((tab) => (
+            <button 
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as any)}
+                className={`flex-1 min-w-[70px] py-3 text-xs font-bold flex flex-col items-center justify-center gap-1.5 border-b-2 transition-colors ${activeTab === tab.id ? 'border-indigo-600 text-indigo-600 bg-indigo-50/30' : 'border-transparent text-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}
+            >
+                <tab.icon size={16}/>
+                {tab.label}
+            </button>
+        ))}
+      </div>
+
+      {/* Content Area */}
+      <div className="flex-1 overflow-hidden relative">
+          <div className="absolute inset-0 overflow-y-auto p-5 custom-scrollbar">
+            {activeTab === 'connectors' && renderConnectors()}
+            {activeTab === 'ontology' && renderOntology()}
+            {activeTab === 'intelligence' && renderIntelligence()}
+            {activeTab === 'model' && renderModelEngine()}
+            {activeTab === 'manual' && (
+                <div className="flex flex-col items-center justify-center h-full text-slate-400 space-y-4">
+                    <Upload size={48} className="opacity-20"/>
+                    <p className="text-xs">请选择上方 <span className="font-bold text-slate-600">“系统集成”</span> 标签页配置自动同步，<br/>或在此处拖拽 JSON 文件进行离线更新。</p>
+                </div>
+            )}
           </div>
-        )}
+      </div>
 
-        {/* === TAB 4: MANUAL IMPORT (Legacy) === */}
-        {activeTab === 'manual' && (
-          <div className="space-y-4 animate-in fade-in slide-in-from-right-4">
-             <div className="bg-blue-50 border border-blue-100 p-3 rounded-lg text-xs text-blue-800 flex items-start gap-2">
-               <AlertCircle size={16} className="shrink-0 mt-0.5"/>
-               <p>手动导入模式适用于离线数据更新或系统初始化。请确保上传符合 Standard JSON Schema 的文件。</p>
-             </div>
-
-             <div className="grid grid-cols-1 gap-4">
-               {/* 1. Global Topology */}
-               <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-                  <div className="flex justify-between items-center mb-3">
-                    <div className="flex items-center gap-2">
-                      <div className="p-2 bg-indigo-100 text-indigo-600 rounded">
-                        <Database size={18}/>
-                      </div>
-                      <div>
-                        <h3 className="font-bold text-slate-800 text-sm">供应链拓扑网络</h3>
-                        <p className="text-[10px] text-slate-500">Nodes, Links (Graph Structure)</p>
-                      </div>
-                    </div>
-                    {importStatus['graph'] && <span className="text-[10px] text-emerald-600 font-bold">{importStatus['graph']}</span>}
-                  </div>
-                  <label className="flex items-center justify-center w-full h-24 border-2 border-dashed border-slate-300 rounded-lg cursor-pointer hover:bg-slate-50 transition-colors">
-                      <div className="flex flex-col items-center pt-5 pb-6">
-                          <Upload className="w-6 h-6 text-slate-400 mb-2"/>
-                          <p className="text-xs text-slate-500"><span className="font-semibold">点击上传</span> JSON 文件</p>
-                      </div>
-                      <input type="file" className="hidden" accept=".json" onChange={(e) => handleFileUpload('graph', e)}/>
-                  </label>
-               </div>
-
-               {/* 2. Inventory Data */}
-               <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-                  <div className="flex justify-between items-center mb-3">
-                    <div className="flex items-center gap-2">
-                      <div className="p-2 bg-purple-100 text-purple-600 rounded">
-                        <FileJson size={18}/>
-                      </div>
-                      <div>
-                        <h3 className="font-bold text-slate-800 text-sm">库存明细数据</h3>
-                        <p className="text-[10px] text-slate-500">Warehouse levels per Base</p>
-                      </div>
-                    </div>
-                    {importStatus['inventory'] && <span className="text-[10px] text-emerald-600 font-bold">{importStatus['inventory']}</span>}
-                  </div>
-                  <label className="flex items-center justify-center w-full h-16 border-2 border-dashed border-slate-300 rounded-lg cursor-pointer hover:bg-slate-50 transition-colors">
-                      <div className="flex items-center gap-2">
-                          <Upload className="w-4 h-4 text-slate-400"/>
-                          <span className="text-xs text-slate-500">导入库存 JSON</span>
-                      </div>
-                      <input type="file" className="hidden" accept=".json" onChange={(e) => handleFileUpload('inventory', e)}/>
-                  </label>
-               </div>
-
-               {/* 3. Orders */}
-               <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-                  <div className="flex justify-between items-center mb-3">
-                    <div className="flex items-center gap-2">
-                      <div className="p-2 bg-emerald-100 text-emerald-600 rounded">
-                        <FileJson size={18}/>
-                      </div>
-                      <div>
-                        <h3 className="font-bold text-slate-800 text-sm">销售订单与预测</h3>
-                        <p className="text-[10px] text-slate-500">Orders, Forecast Data</p>
-                      </div>
-                    </div>
-                    {importStatus['orders'] && <span className="text-[10px] text-emerald-600 font-bold">{importStatus['orders']}</span>}
-                  </div>
-                  <label className="flex items-center justify-center w-full h-16 border-2 border-dashed border-slate-300 rounded-lg cursor-pointer hover:bg-slate-50 transition-colors">
-                      <div className="flex items-center gap-2">
-                          <Upload className="w-4 h-4 text-slate-400"/>
-                          <span className="text-xs text-slate-500">导入订单 JSON</span>
-                      </div>
-                      <input type="file" className="hidden" accept=".json" onChange={(e) => handleFileUpload('orders', e)}/>
-                  </label>
-               </div>
-
-                {/* 4. Production */}
-               <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-                  <div className="flex justify-between items-center mb-3">
-                    <div className="flex items-center gap-2">
-                      <div className="p-2 bg-amber-100 text-amber-600 rounded">
-                        <FileJson size={18}/>
-                      </div>
-                      <div>
-                        <h3 className="font-bold text-slate-800 text-sm">产线状态数据</h3>
-                        <p className="text-[10px] text-slate-500">MES Production Lines</p>
-                      </div>
-                    </div>
-                    {importStatus['production'] && <span className="text-[10px] text-emerald-600 font-bold">{importStatus['production']}</span>}
-                  </div>
-                  <label className="flex items-center justify-center w-full h-16 border-2 border-dashed border-slate-300 rounded-lg cursor-pointer hover:bg-slate-50 transition-colors">
-                      <div className="flex items-center gap-2">
-                          <Upload className="w-4 h-4 text-slate-400"/>
-                          <span className="text-xs text-slate-500">导入产线 JSON</span>
-                      </div>
-                      <input type="file" className="hidden" accept=".json" onChange={(e) => handleFileUpload('production', e)}/>
-                  </label>
-               </div>
-             </div>
-          </div>
-        )}
+      {/* Footer Save Action */}
+      <div className="p-4 border-t border-slate-200 bg-white shrink-0">
+          <button 
+            onClick={handleSaveConfig}
+            className="w-full bg-slate-800 hover:bg-slate-900 text-white py-3 rounded-lg font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-lg active:scale-95"
+          >
+            {showSaved ? <CheckCircle2 size={18} className="text-emerald-400"/> : <Save size={18}/>}
+            {showSaved ? '配置已保存' : '保存系统设置'}
+          </button>
       </div>
     </div>
   );

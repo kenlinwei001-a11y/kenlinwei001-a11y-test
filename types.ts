@@ -131,8 +131,8 @@ export interface ChatMessage {
   timestamp: Date;
 }
 
-// --- NEW TYPES FOR SETTINGS & INTEGRATION ---
-export type LLMProvider = 'gemini' | 'kimi';
+// --- SETTINGS & INTEGRATION ---
+export type LLMProvider = 'gemini' | 'kimi' | 'rendu';
 
 export interface LLMConfig {
   provider: LLMProvider;
@@ -163,4 +163,51 @@ export interface DataPipelineConfig {
   syncFrequency: 'realtime' | 'hourly' | 'daily' | 'manual';
   aggregationLogic: string; // e.g. "SUM(quantity) WHERE warehouse_type='FG'"
   active: boolean;
+}
+
+// --- DOMAIN MODELING (ONTOLOGY) ---
+export interface PropertyDef {
+  id: string;
+  name: string;
+  dataType: 'string' | 'number' | 'date' | 'boolean' | 'enum';
+  description?: string;
+}
+
+export interface ActionParam {
+  name: string;
+  type: string;
+}
+
+export interface ActionDef {
+  id: string;
+  name: string;
+  description: string;
+  parameters: ActionParam[];
+  type: 'Create' | 'Update' | 'Delete' | 'TriggerWorkflow';
+}
+
+export interface ObjectTypeDef {
+  id: string;
+  name: string; // e.g. "CustomerOrder"
+  icon: string; // Lucide icon name
+  properties: PropertyDef[];
+  actions: ActionDef[];
+}
+
+// --- INTELLIGENCE CORE (AIP) ---
+export interface AISkill {
+  id: string;
+  name: string;
+  description: string;
+  linkedActionId?: string; // Links to Ontology Action
+  isEnabled: boolean;
+}
+
+export interface AIAgentConfig {
+  id: string;
+  name: string;
+  role: string;
+  systemPrompt: string;
+  ragEnabled: boolean;
+  knowledgeBaseIds: string[];
 }
