@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ConstraintCategory, ConstraintItem, NodeData, NodeType, ScenarioConfig, ConstraintLogic, ConstraintRelationType } from '../types';
-import { Settings, Sliders, Activity, Zap, Search, Plus, Save, X, Sparkles, Trash2, List, Edit2, ArrowDown, GitCommit, Database as DbIcon, Link as LinkIcon, AlertTriangle } from 'lucide-react';
+import { Settings, Sliders, Activity, Zap, Search, Plus, Save, X, Sparkles, Trash2, List, Edit2, ArrowDown, GitCommit, Database as DbIcon, Link as LinkIcon, AlertTriangle, BrainCircuit } from 'lucide-react';
 
 interface Props {
   constraints: ConstraintCategory[];
@@ -45,7 +45,8 @@ const ConstraintPanel: React.FC<Props> = ({
       logic: {
           relationType: 'IMPACT',
           operator: '>'
-      }
+      },
+      source: 'manual'
   });
 
   // AI Parsing State
@@ -122,7 +123,8 @@ const ConstraintPanel: React.FC<Props> = ({
           description: '',
           enabled: true,
           impactLevel: 'medium',
-          logic: { relationType: 'TRIGGER', operator: '>' }
+          logic: { relationType: 'TRIGGER', operator: '>' },
+          source: 'manual'
       });
       setIsEditingConstraint(true);
       setNewConstraintText('');
@@ -188,7 +190,7 @@ const ConstraintPanel: React.FC<Props> = ({
             onClick={() => setActiveTab('constraints')}
         >
             <Sliders size={16} />
-            本体配置
+            推演配置
         </button>
       </div>
 
@@ -212,7 +214,7 @@ const ConstraintPanel: React.FC<Props> = ({
                         </h3>
                         <div className="space-y-3">
                             {category.items.map((item) => (
-                            <div key={item.id} className="group bg-slate-50 rounded-lg p-3 border border-slate-100 hover:border-slate-300 transition-colors">
+                            <div key={item.id} className={`group bg-slate-50 rounded-lg p-3 border transition-colors ${item.source === 'ai' ? 'border-purple-200 bg-purple-50/50' : 'border-slate-100 hover:border-slate-300'}`}>
                                 <div className="flex justify-between items-start mb-1">
                                     <div className="flex items-center gap-2">
                                         <button 
@@ -224,6 +226,11 @@ const ConstraintPanel: React.FC<Props> = ({
                                         <label className="text-sm font-semibold text-slate-700 cursor-pointer select-none">
                                             {item.label}
                                         </label>
+                                        {item.source === 'ai' && (
+                                            <span className="flex items-center gap-1 text-[9px] font-bold text-white bg-purple-500 px-1.5 py-0.5 rounded-full">
+                                                <BrainCircuit size={8} /> AI
+                                            </span>
+                                        )}
                                     </div>
                                 <div className="relative inline-block w-10 mr-2 align-middle select-none transition duration-200 ease-in">
                                     <input 
@@ -377,7 +384,21 @@ const ConstraintPanel: React.FC<Props> = ({
                                     onChange={(e) => updateLogic('targetNodeId', e.target.value)}
                                 >
                                     <option value="">(关联下游 / 自身)</option>
-                                    {nodes.map(n => <option key={n.id} value={n.id}>{n.name}</option>)}
+                                    <optgroup label="物料关联 - 上游企业">
+                                        {nodes.filter(n => n.type === NodeType.SUPPLIER).map(n => (
+                                            <option key={n.id} value={n.id}>{n.name}</option>
+                                        ))}
+                                    </optgroup>
+                                    <optgroup label="工艺型号关联 - 基地产线">
+                                        {nodes.filter(n => n.type === NodeType.BASE).map(n => (
+                                            <option key={n.id} value={n.id}>{n.name}</option>
+                                        ))}
+                                    </optgroup>
+                                    <optgroup label="电池型号关联 - 下游客户">
+                                        {nodes.filter(n => n.type === NodeType.CUSTOMER).map(n => (
+                                            <option key={n.id} value={n.id}>{n.name}</option>
+                                        ))}
+                                    </optgroup>
                                 </select>
                                 <input 
                                     type="text" 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Layers, Database, Activity, Share2, Menu } from 'lucide-react';
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, Type } from "@google/genai";
 import SupplyChainGraph from './components/SupplyChainGraph';
 import ConstraintPanel from './components/ConstraintPanel';
 import AIChat from './components/AIChat';
@@ -19,7 +19,7 @@ function App() {
     {
       id: 'welcome',
       role: 'model',
-      content: '我是您的供应链智能助手。请在左侧“场景模拟”面板添加多个事件（如：某基地产线故障 + 某客户需求激增），然后点击执行联合推演。我将为您生成综合应对方案、数据比对及完整的推理链条。',
+      content: '我是您的供应链智能助手。我可以帮助您进行推演，或者从我们的对话中自动学习新的业务规则并添加到知识库中。',
       timestamp: new Date()
     }
   ]);
@@ -37,7 +37,7 @@ function App() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Standard Chat Interaction
+  // Standard Chat Interaction with Rule Learning Tool
   const handleUserMessage = async (text: string) => {
     const userMsg: ChatMessage = { id: Date.now().toString(), role: 'user', content: text, timestamp: new Date() };
     setMessages(prev => [...prev, userMsg]);
@@ -45,32 +45,95 @@ function App() {
 
     try {
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+      
       const systemPrompt = `
       你是一个供应链专家助手。
       当前上下文：用户正在浏览锂电产销推演界面。
-      历史对话主要围绕方案比对。
       
-      请简短、专业地回答用户的问题。如果用户询问某个方案的细节，请基于之前的推演结果（如果有）进行逻辑扩展。
-      不要提及Palantir。
+      【你的能力】
+      1. 回答用户关于供应链的问题。
+      2. **知识学习**: 如果用户提到了一条新的业务规则、约束条件或逻辑（例如“如果库存低于1000则报警”），你**必须**调用工具 'learn_rule' 将其保存到知识库。
+      
+      【注意】
+      - 仅当用户明确表达规则时才调用工具。
+      - 如果只是询问信息，则直接回答。
+      - 调用工具后，向用户确认规则已添加。
       `;
 
-      // We should ideally pass conversation history, but for simplicity we pass the last user prompt + system context
+      // Define the tool for learning rules
+      const learnRuleTool = {
+          functionDeclarations: [
+              {
+                  name: "learn_rule",
+                  description: "Automatically extracts and saves a business rule or constraint from the conversation to the knowledge base.",
+                  parameters: {
+                      type: Type.OBJECT,
+                      properties: {
+                          label: { type: Type.STRING, description: "Short, descriptive title for the rule (e.g., 'Safety Stock Alert')." },
+                          description: { type: Type.STRING, description: "Detailed description of the business logic." },
+                          impactLevel: { type: Type.STRING, enum: ["low", "medium", "high"], description: "The severity or priority of this rule." },
+                          pseudoLogic: { type: Type.STRING, description: "A structured pseudo-code representation (e.g., 'IF inventory < 1000 THEN alert')." }
+                      },
+                      required: ["label", "description", "impactLevel"]
+                  }
+              }
+          ]
+      };
+
       const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash-latest',
-        contents: [{ role: 'user', parts: [{ text: systemPrompt + "\n用户: " + text }] }],
+        contents: [
+            { role: 'user', parts: [{ text: systemPrompt + "\n用户: " + text }] }
+        ],
+        config: {
+            tools: [learnRuleTool],
+        }
       });
 
-      const reply = response.text || "我暂时无法理解，请重试。";
-      setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: 'model', content: reply, timestamp: new Date() }]);
+      // Check for Function Calls (Tool Use)
+      const functionCalls = response.functionCalls;
+      
+      if (functionCalls && functionCalls.length > 0) {
+          const call = functionCalls[0];
+          if (call.name === 'learn_rule') {
+              const args = call.args as any;
+              
+              // Execute: Add to Knowledge Base (Constraints State)
+              const newRule: ConstraintItem = {
+                  id: `ai-learned-${Date.now()}`,
+                  label: args.label,
+                  description: args.description,
+                  impactLevel: args.impactLevel,
+                  enabled: true,
+                  source: 'ai', // Mark as AI learned
+                  logic: { 
+                      relationType: 'TRIGGER', 
+                      actionDescription: args.pseudoLogic || 'AI Inferenced Logic'
+                  }
+              };
+              
+              handleAddConstraint(newRule);
+
+              // Respond to user confirming the action
+              const confirmMsg = `✅ 已自动学习规则：**${args.label}**\n\n该规则已同步至推演配置知识库，并即刻生效。`;
+              setMessages(prev => [...prev, { id: Date.now().toString(), role: 'model', content: confirmMsg, timestamp: new Date() }]);
+          }
+      } else {
+          // Standard text response
+          const reply = response.text || "我暂时无法理解，请重试。";
+          setMessages(prev => [...prev, { id: Date.now().toString(), role: 'model', content: reply, timestamp: new Date() }]);
+      }
+
     } catch (e) {
-      setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: 'model', content: "服务繁忙，请稍后。", timestamp: new Date() }]);
+      console.error(e);
+      setMessages(prev => [...prev, { id: Date.now().toString(), role: 'model', content: "服务繁忙，请稍后。", timestamp: new Date() }]);
     } finally {
       setIsAiThinking(false);
     }
   };
 
   const handleAnalyzeConstraint = async (text: string): Promise<Partial<ConstraintItem>> => {
-    // Only used for constraint parsing, minimal visual blocking
+    // Only used for manual constraint builder in the panel
     try {
         const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
         const prompt = `
@@ -135,7 +198,7 @@ function App() {
         if (exists) {
             return prev.map(c => c.id === customCatId ? { ...c, items: [...c.items, item] } : c);
         } else {
-            return [...prev, { id: customCatId, name: '自定义业务规则', items: [item] }];
+            return [...prev, { id: customCatId, name: '知识库 / 自定义规则', items: [item] }];
         }
     });
   };
@@ -305,7 +368,7 @@ function App() {
             <Share2 size={20} />
           </div>
           <div>
-            <h1 className="font-bold text-slate-800 text-lg leading-tight">LithiumChain 产销智能推演</h1>
+            <h1 className="font-bold text-slate-800 text-lg leading-tight">CALB产销智能推演系统</h1>
             <p className="text-xs text-slate-500 font-medium">Scenario: 2024-Q4-Optimized-v2</p>
           </div>
         </div>

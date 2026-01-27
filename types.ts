@@ -68,6 +68,7 @@ export interface ConstraintItem {
   impactLevel: 'low' | 'medium' | 'high';
   formula?: string; // Legacy string representation
   logic?: ConstraintLogic; // Structured Ontology Logic
+  source?: 'manual' | 'ai'; // Track origin of the rule
 }
 
 // Updated Scenario Interface for Manual Input
