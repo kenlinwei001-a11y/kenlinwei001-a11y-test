@@ -131,7 +131,7 @@ export interface ChatMessage {
   timestamp: Date;
 }
 
-// --- NEW TYPES FOR SETTINGS ---
+// --- NEW TYPES FOR SETTINGS & INTEGRATION ---
 export type LLMProvider = 'gemini' | 'kimi';
 
 export interface LLMConfig {
@@ -139,4 +139,28 @@ export interface LLMConfig {
   apiKey: string;
   baseUrl?: string; // Optional custom base URL
   modelName?: string; // e.g. 'moonshot-v1-8k'
+}
+
+// Connector Types
+export type DataSourceType = 'SAP' | 'MES' | 'CRM' | 'IOT' | 'WMS' | 'SQL';
+
+export interface DataSourceConfig {
+  id: string;
+  name: string;
+  type: DataSourceType;
+  endpoint: string;
+  authType: 'API_KEY' | 'OAUTH2' | 'BASIC';
+  username?: string; // Optional
+  status: 'connected' | 'disconnected' | 'error';
+  lastSync?: string;
+}
+
+export interface DataPipelineConfig {
+  id: string;
+  name: string;
+  sourceId: string; // References DataSourceConfig.id
+  targetEntity: 'Inventory' | 'Orders' | 'Production' | 'Graph'; // What aspect of the twin is updated
+  syncFrequency: 'realtime' | 'hourly' | 'daily' | 'manual';
+  aggregationLogic: string; // e.g. "SUM(quantity) WHERE warehouse_type='FG'"
+  active: boolean;
 }
