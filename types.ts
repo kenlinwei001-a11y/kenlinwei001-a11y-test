@@ -1,3 +1,4 @@
+
 export enum NodeType {
   SUPPLIER = 'SUPPLIER',
   BASE = 'BASE',
@@ -128,4 +129,14 @@ export interface ChatMessage {
   role: 'user' | 'model';
   content: string;
   timestamp: Date;
+}
+
+// --- NEW TYPES FOR SETTINGS ---
+export type LLMProvider = 'gemini' | 'kimi';
+
+export interface LLMConfig {
+  provider: LLMProvider;
+  apiKey: string;
+  baseUrl?: string; // Optional custom base URL
+  modelName?: string; // e.g. 'moonshot-v1-8k'
 }

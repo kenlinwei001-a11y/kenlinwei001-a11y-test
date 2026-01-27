@@ -1,5 +1,6 @@
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Layers, Database, Activity, Share2, Menu, Play, RotateCcw, MessageSquare, LayoutDashboard, Settings2, Sliders, ChevronLeft, Zap, GitBranch, Settings, Package, ShoppingCart, Factory, AlertTriangle } from 'lucide-react';
+import { Layers, Database, Activity, Share2, Menu, Play, RotateCcw, MessageSquare, LayoutDashboard, Settings2, Sliders, ChevronLeft, Zap, GitBranch, Settings, Package, ShoppingCart, Factory, AlertTriangle, Server } from 'lucide-react';
 import { GoogleGenAI, Type } from "@google/genai";
 import SupplyChainGraph from './components/SupplyChainGraph';
 import ConstraintPanel from './components/ConstraintPanel';
@@ -8,22 +9,36 @@ import DashboardPanel from './components/DashboardPanel';
 import InventoryPanel from './components/InventoryPanel';
 import SalesPanel from './components/SalesPanel';
 import ProductionMonitorPanel from './components/ProductionMonitorPanel';
+import SettingsPanel from './components/SettingsPanel'; // New Import
 import Tooltip from './components/Tooltip';
 import { AnomalyAnalysisModal } from './components/AnomalyAnalysisModal';
 import { MOCK_DATA, INITIAL_CONSTRAINTS } from './constants';
-import { GraphData, NodeData, ConstraintCategory, ScenarioConfig, ChatMessage, ConstraintItem } from './types';
+import { GraphData, NodeData, ConstraintCategory, ScenarioConfig, ChatMessage, ConstraintItem, LLMConfig } from './types';
+
+// Default Config
+const DEFAULT_LLM_CONFIG: LLMConfig = {
+    provider: 'gemini',
+    apiKey: process.env.API_KEY || '',
+    modelName: 'gemini-2.5-flash-latest'
+};
 
 function App() {
   const [constraints, setConstraints] = useState<ConstraintCategory[]>(INITIAL_CONSTRAINTS);
   const [graphData, setGraphData] = useState<GraphData>(MOCK_DATA);
   const [hoveredNode, setHoveredNode] = useState<{ node: NodeData | null; x: number; y: number }>({ node: null, x: 0, y: 0 });
   
+  // LLM Configuration State
+  const [llmConfig, setLlmConfig] = useState<LLMConfig>(() => {
+      const saved = localStorage.getItem('supply_chain_llm_config');
+      return saved ? JSON.parse(saved) : DEFAULT_LLM_CONFIG;
+  });
+
   // Selection State for Multi-Node Analysis
   const [selectedNodes, setSelectedNodes] = useState<NodeData[]>([]);
   const [isAnalysisModalOpen, setIsAnalysisModalOpen] = useState(false);
 
   // Panel State (Left Sidebar)
-  const [activePanel, setActivePanel] = useState<'none' | 'scenario' | 'config' | 'dashboard' | 'chat' | 'inventory' | 'sales' | 'production'>('none');
+  const [activePanel, setActivePanel] = useState<'none' | 'scenario' | 'config' | 'dashboard' | 'chat' | 'inventory' | 'sales' | 'production' | 'settings'>('none');
 
   const [dimensions, setDimensions] = useState({ width: window.innerWidth, height: window.innerHeight - 64 }); 
   
@@ -51,6 +66,34 @@ function App() {
     return () => window.removeEventListener('resize', handleResize);
   }, [activePanel]);
 
+  // Save config on change
+  const handleConfigSave = (newConfig: LLMConfig) => {
+      setLlmConfig(newConfig);
+      localStorage.setItem('supply_chain_llm_config', JSON.stringify(newConfig));
+  };
+
+  // Handle Data Import
+  const handleDataImport = (type: string, importedData: any) => {
+      if (type === 'graph') {
+          // Validate minimally
+          if (importedData.nodes && importedData.links) {
+              setGraphData(importedData);
+              alert('拓扑结构已更新');
+          }
+      } else if (type === 'inventory') {
+          // Merge logic would go here. For now, we update node details if ID matches
+          // This is a simplified implementation for demonstration
+          const newNodes = graphData.nodes.map(n => {
+              const update = importedData.find((d: any) => d.id === n.id);
+              if (update) return { ...n, ...update };
+              return n;
+          });
+          setGraphData({ ...graphData, nodes: newNodes });
+          alert('库存数据已更新');
+      } 
+      // Add more handlers for orders/production...
+  };
+
   // Cleanup timeout
   useEffect(() => {
     return () => {
@@ -60,6 +103,48 @@ function App() {
     };
   }, []);
 
+  // --- UNIVERSAL AI CALLER ---
+  const callAI = async (prompt: string, tools?: any[]) => {
+      if (llmConfig.provider === 'gemini') {
+          const ai = new GoogleGenAI({ apiKey: llmConfig.apiKey });
+          const response = await ai.models.generateContent({
+            model: llmConfig.modelName || 'gemini-2.5-flash-latest',
+            contents: [{ role: 'user', parts: [{ text: prompt }] }],
+            config: { tools: tools }
+          });
+          return {
+              text: response.text,
+              functionCalls: response.functionCalls
+          };
+      } else if (llmConfig.provider === 'kimi') {
+          // OpenAI Compatible Fetch for Kimi / Moonshot
+          const baseUrl = llmConfig.baseUrl || 'https://api.moonshot.cn/v1';
+          const response = await fetch(`${baseUrl}/chat/completions`, {
+              method: 'POST',
+              headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${llmConfig.apiKey}`
+              },
+              body: JSON.stringify({
+                  model: llmConfig.modelName || 'moonshot-v1-8k',
+                  messages: [{ role: 'user', content: prompt }],
+                  temperature: 0.3,
+                  // Map Gemini tools to OpenAI tools format if needed. 
+                  // For this demo, Kimi integration primarily supports text-only for simplicity unless tool schema translation is added.
+                  // tools: tools ? mapGeminiToolsToOpenAI(tools) : undefined 
+              })
+          });
+          const data = await response.json();
+          const choice = data.choices?.[0];
+          return {
+              text: choice?.message?.content || '',
+              functionCalls: choice?.message?.tool_calls // Needs mapping if we support generic tools on Kimi
+          };
+      }
+      throw new Error("Unknown provider");
+  };
+
+
   // Standard Chat Interaction with Rule Learning Tool
   const handleUserMessage = async (text: string) => {
     const userMsg: ChatMessage = { id: Date.now().toString(), role: 'user', content: text, timestamp: new Date() };
@@ -67,8 +152,6 @@ function App() {
     setIsAiThinking(true);
 
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
-      
       const systemPrompt = `
       你是一个供应链专家助手。
       当前上下文：用户正在浏览锂电产销推演界面。
@@ -81,9 +164,10 @@ function App() {
       - 仅当用户明确表达规则时才调用工具。
       - 如果只是询问信息，则直接回答。
       - 调用工具后，向用户确认规则已添加。
+      \n用户: ${text}
       `;
 
-      // Define the tool for learning rules
+      // Define the tool for learning rules (Only active for Gemini in this basic implementation)
       const learnRuleTool = {
           functionDeclarations: [
               {
@@ -102,19 +186,15 @@ function App() {
               }
           ]
       };
-
-      const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash-latest',
-        contents: [
-            { role: 'user', parts: [{ text: systemPrompt + "\n用户: " + text }] }
-        ],
-        config: {
-            tools: [learnRuleTool],
-        }
-      });
+      
+      // Use generic caller
+      // Note: Kimi tool calling mapping is complex, for this demo "learn_rule" works best on Gemini.
+      // If Kimi is selected, we might degrade to text-only or parse JSON from text.
+      const aiResult = await callAI(systemPrompt, llmConfig.provider === 'gemini' ? [learnRuleTool] : undefined);
 
       // Check for Function Calls (Tool Use)
-      const functionCalls = response.functionCalls;
+      // Simplification: only handling Gemini style function calls structure returned by our wrapper
+      const functionCalls = aiResult.functionCalls;
       
       if (functionCalls && functionCalls.length > 0) {
           const call = functionCalls[0];
@@ -143,13 +223,13 @@ function App() {
           }
       } else {
           // Standard text response
-          const reply = response.text || "我暂时无法理解，请重试。";
+          const reply = aiResult.text || "我暂时无法理解，请重试。";
           setMessages(prev => [...prev, { id: Date.now().toString(), role: 'model', content: reply, timestamp: new Date() }]);
       }
 
     } catch (e) {
       console.error(e);
-      setMessages(prev => [...prev, { id: Date.now().toString(), role: 'model', content: "服务繁忙，请稍后。", timestamp: new Date() }]);
+      setMessages(prev => [...prev, { id: Date.now().toString(), role: 'model', content: "服务繁忙或配置错误，请检查设置。", timestamp: new Date() }]);
     } finally {
       setIsAiThinking(false);
     }
@@ -158,7 +238,6 @@ function App() {
   const handleAnalyzeConstraint = async (text: string): Promise<Partial<ConstraintItem>> => {
     // Only used for manual constraint builder in the panel
     try {
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
         const prompt = `
         You are a supply chain expert system.
         Convert the following natural language constraint into a structured configuration.
@@ -175,12 +254,8 @@ function App() {
         }
         `;
         
-        const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash-latest',
-            contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        });
-
-        const textRes = response.text || "{}";
+        const result = await callAI(prompt);
+        const textRes = result.text || "{}";
         // Clean markdown if present
         const jsonStr = textRes.replace(/```json/g, '').replace(/```/g, '').trim();
         return JSON.parse(jsonStr);
@@ -231,7 +306,7 @@ function App() {
     setIsAiThinking(true);
     
     // Deep copy current graph data to apply simulation changes
-    const newGraph: GraphData = JSON.parse(JSON.stringify(MOCK_DATA));
+    const newGraph: GraphData = JSON.parse(JSON.stringify(graphData)); // Use graphData from state
 
     // Iterate through all configs and apply visual impacts cumulatively
     configs.forEach(config => {
@@ -341,7 +416,7 @@ function App() {
     }, 5000);
   }, []);
 
-  const togglePanel = (panel: 'scenario' | 'config' | 'dashboard' | 'chat' | 'inventory' | 'sales' | 'production') => {
+  const togglePanel = (panel: 'scenario' | 'config' | 'dashboard' | 'chat' | 'inventory' | 'sales' | 'production' | 'settings') => {
       setActivePanel(prev => prev === panel ? 'none' : panel);
   };
 
@@ -458,6 +533,19 @@ function App() {
 
             <div className="flex-1"></div>
 
+             {/* New Settings Button */}
+             <div className="flex flex-col gap-2 w-full px-2 mb-2">
+                 <button 
+                    onClick={() => togglePanel('settings')}
+                    className={`w-10 h-10 rounded-lg flex items-center justify-center transition-all duration-200 group relative ${activePanel === 'settings' ? 'bg-slate-700 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}
+                >
+                    <Server size={20} strokeWidth={activePanel === 'settings' ? 2.5 : 2} />
+                    <span className="absolute left-full ml-3 top-1/2 -translate-y-1/2 bg-slate-900 text-white text-[10px] font-bold px-2 py-1 rounded border border-slate-700 opacity-0 group-hover:opacity-100 whitespace-nowrap pointer-events-none transition-opacity shadow-xl z-50">
+                        系统设置 (System)
+                    </span>
+                </button>
+             </div>
+
             {/* Bottom Group: Assistant */}
             <button 
                 onClick={() => togglePanel('chat')}
@@ -474,7 +562,7 @@ function App() {
         {activePanel !== 'none' && (
              <div 
                 className="absolute left-14 top-0 bottom-0 z-30 bg-white border-r border-slate-200 shadow-2xl transition-transform duration-300 ease-in-out transform translate-x-0"
-                style={{ width: ['dashboard', 'inventory', 'sales', 'production'].includes(activePanel) ? '480px' : '400px' }}
+                style={{ width: ['dashboard', 'inventory', 'sales', 'production', 'settings'].includes(activePanel) ? '480px' : '400px' }}
              >
                  {/* Close Handle (Right side of panel) */}
                  <div 
@@ -502,6 +590,13 @@ function App() {
                     {activePanel === 'inventory' && <InventoryPanel />}
                     {activePanel === 'sales' && <SalesPanel />}
                     {activePanel === 'production' && <ProductionMonitorPanel />}
+                    {activePanel === 'settings' && (
+                        <SettingsPanel 
+                            currentConfig={llmConfig}
+                            onConfigSave={handleConfigSave}
+                            onDataImport={handleDataImport}
+                        />
+                    )}
                     {activePanel === 'chat' && (
                          <AIChat 
                             messages={messages} 
