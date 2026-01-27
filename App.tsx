@@ -13,7 +13,7 @@ import SettingsPanel from './components/SettingsPanel';
 import Tooltip from './components/Tooltip';
 import { AnomalyAnalysisModal } from './components/AnomalyAnalysisModal';
 import { MOCK_DATA, INITIAL_CONSTRAINTS } from './constants';
-import { GraphData, NodeData, ConstraintCategory, ScenarioConfig, ChatMessage, ConstraintItem, LLMConfig, ThemeConfig } from './types';
+import { GraphData, NodeData, ConstraintCategory, ScenarioConfig, ChatMessage, ConstraintItem, LLMConfig, ThemeConfig, LayoutMode } from './types';
 
 // Default Config
 const DEFAULT_LLM_CONFIG: LLMConfig = {
@@ -23,6 +23,7 @@ const DEFAULT_LLM_CONFIG: LLMConfig = {
 };
 
 const DEFAULT_THEME: ThemeConfig = {
+    layoutMode: 'bento',
     heroColor: 'bg-emerald-600',
     operationsColor: 'bg-slate-900',
     productionColor: 'bg-[#FEF3C7]', // Bright Orange Yellow (Amber 100)
@@ -114,7 +115,7 @@ function App() {
     window.addEventListener('resize', handleResize);
     handleResize(); // Initial
     return () => window.removeEventListener('resize', handleResize);
-  }, [activeView]);
+  }, [activeView, theme.layoutMode]); // Re-calc on layout change
 
   // Resize Observer for Hero Card
   useEffect(() => {
@@ -130,7 +131,7 @@ function App() {
         resizeObserver.observe(heroCardRef.current);
         return () => resizeObserver.disconnect();
     }
-  }, [activeView]);
+  }, [activeView, theme.layoutMode]); // Re-observe on layout change
 
   const handleConfigSave = (newConfig: LLMConfig) => {
       setLlmConfig(newConfig);
@@ -308,6 +309,39 @@ function App() {
     tooltipTimeoutRef.current = setTimeout(() => { setHoveredNode(prev => ({ ...prev, node: null })); }, 3000);
   }, []);
 
+  // --- Layout Configuration Helpers ---
+  const getGridClasses = (mode: LayoutMode, cardType: 'hero' | 'ops' | 'prod' | 'inv' | 'sales') => {
+      if (mode === 'cinematic') {
+          // Top heavy layout: Hero takes full top, others small below
+          switch (cardType) {
+              case 'hero': return 'col-span-12 row-span-7';
+              case 'ops': return 'col-span-3 row-span-5';
+              case 'prod': return 'col-span-3 row-span-5';
+              case 'inv': return 'col-span-3 row-span-5';
+              case 'sales': return 'col-span-3 row-span-5';
+          }
+      } else if (mode === 'balanced') {
+          // Left/Right Split: Hero & Ops Left, Others Right
+          switch (cardType) {
+              case 'hero': return 'col-span-6 row-span-8'; // Left Top
+              case 'ops': return 'col-span-6 row-span-4'; // Left Bottom
+              case 'prod': return 'col-span-6 row-span-4'; // Right Top
+              case 'inv': return 'col-span-6 row-span-4'; // Right Middle
+              case 'sales': return 'col-span-6 row-span-4'; // Right Bottom
+          }
+      } else {
+          // Default Bento
+          switch (cardType) {
+              case 'hero': return 'col-span-8 row-span-8';
+              case 'ops': return 'col-span-4 row-span-4';
+              case 'prod': return 'col-span-4 row-span-4';
+              case 'inv': return 'col-span-6 row-span-4';
+              case 'sales': return 'col-span-6 row-span-4';
+          }
+      }
+      return '';
+  };
+
   // --- RENDER CONTENT ---
   return (
     <div className="flex flex-col h-screen bg-slate-50 overflow-hidden font-sans">
@@ -404,21 +438,21 @@ function App() {
                 <div className="h-full w-full p-6 overflow-hidden">
                     <div className="grid grid-cols-12 grid-rows-12 gap-5 h-full">
                         
-                        {/* 1. Hero Card: Graph (8x8) Top Left */}
+                        {/* 1. Hero Card: Graph */}
                         <div 
                             ref={heroCardRef}
                             onClick={() => setActiveView('graph_full')}
-                            className={`col-span-8 row-span-8 ${theme.heroColor} rounded-[24px] relative overflow-hidden group cursor-pointer shadow-xl transition-all duration-300 hover:scale-[1.005]`}
+                            className={`${getGridClasses(theme.layoutMode, 'hero')} ${theme.heroColor} rounded-[24px] relative overflow-hidden group cursor-pointer shadow-xl transition-all duration-300 hover:scale-[1.005]`}
                         >
                             {/* Decorative Background Elements */}
                             <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-white/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3"></div>
-                            <div className="absolute bottom-0 left-0 w-[300px] h-[300px] bg-emerald-300/10 rounded-full blur-3xl translate-y-1/3 -translate-x-1/4"></div>
+                            <div className="absolute bottom-0 left-0 w-[300px] h-[300px] bg-white/10 rounded-full blur-3xl translate-y-1/3 -translate-x-1/4"></div>
 
                             {/* Text Overlay */}
                             <div className="absolute top-8 left-8 z-30 text-white pointer-events-none">
                                 <div className="flex items-center gap-2 mb-3">
-                                    <span className="bg-white/10 backdrop-blur-md px-3 py-1 rounded-full text-sm font-bold border border-white/20 text-emerald-50">全景拓扑</span>
-                                    <span className="bg-emerald-500/20 backdrop-blur-md px-2 py-1 rounded-full text-xs font-mono text-emerald-100 flex items-center gap-1 border border-emerald-400/30">
+                                    <span className="bg-white/10 backdrop-blur-md px-3 py-1 rounded-full text-sm font-bold border border-white/20 text-white">全景拓扑</span>
+                                    <span className="bg-white/10 backdrop-blur-md px-2 py-1 rounded-full text-xs font-mono text-white flex items-center gap-1 border border-white/20">
                                         <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></div> 实时监控中
                                     </span>
                                 </div>
@@ -445,10 +479,10 @@ function App() {
                             </div>
                         </div>
 
-                        {/* 2. Operations: Top Right (4x4) */}
+                        {/* 2. Operations: Top Right */}
                         <div 
                             onClick={() => setActiveView('dashboard')}
-                            className={`col-span-4 row-span-4 ${theme.operationsColor} rounded-[24px] p-6 relative overflow-hidden group cursor-pointer shadow-lg transition-all duration-300 hover:translate-y-[-2px] border border-slate-800`}
+                            className={`${getGridClasses(theme.layoutMode, 'ops')} ${theme.operationsColor} rounded-[24px] p-6 relative overflow-hidden group cursor-pointer shadow-lg transition-all duration-300 hover:translate-y-[-2px] border border-slate-800`}
                         >
                             <div className="flex justify-between items-start mb-6">
                                 <div className="p-3 bg-slate-800 rounded-xl text-white border border-slate-700 shadow-inner">
@@ -479,10 +513,10 @@ function App() {
                             </div>
                         </div>
 
-                        {/* 3. Production: Middle Right (4x4) */}
+                        {/* 3. Production: Middle Right */}
                         <div 
                              onClick={() => setActiveView('production')}
-                             className={`col-span-4 row-span-4 ${theme.productionColor} rounded-[24px] p-6 border border-orange-100 shadow-md group cursor-pointer relative transition-all duration-300 hover:shadow-lg hover:border-orange-200`}
+                             className={`${getGridClasses(theme.layoutMode, 'prod')} ${theme.productionColor} rounded-[24px] p-6 border border-slate-100 shadow-md group cursor-pointer relative transition-all duration-300 hover:shadow-lg hover:border-slate-200`}
                         >
                             <div className="flex justify-between items-start mb-4">
                                 <div>
@@ -526,10 +560,10 @@ function App() {
                             </div>
                         </div>
 
-                        {/* 4. Inventory: Bottom Left (6x4) */}
+                        {/* 4. Inventory: Bottom Left */}
                         <div 
                             onClick={() => setActiveView('inventory')}
-                            className={`col-span-6 row-span-4 ${theme.inventoryColor} rounded-[24px] p-6 border border-indigo-100 shadow-md group cursor-pointer relative transition-all duration-300 hover:border-indigo-200`}
+                            className={`${getGridClasses(theme.layoutMode, 'inv')} ${theme.inventoryColor} rounded-[24px] p-6 border border-slate-100 shadow-md group cursor-pointer relative transition-all duration-300 hover:border-slate-200`}
                         >
                              <div className="flex justify-between items-start mb-4">
                                 <div className="flex items-center gap-3">
@@ -574,10 +608,10 @@ function App() {
                             </div>
                         </div>
 
-                        {/* 5. Sales: Bottom Right (6x4) */}
+                        {/* 5. Sales: Bottom Right */}
                         <div 
                              onClick={() => setActiveView('sales')}
-                             className={`col-span-6 row-span-4 ${theme.salesColor} rounded-[24px] p-6 border border-slate-200 shadow-md group cursor-pointer relative transition-all duration-300 hover:border-emerald-300`}
+                             className={`${getGridClasses(theme.layoutMode, 'sales')} ${theme.salesColor} rounded-[24px] p-6 border border-slate-100 shadow-md group cursor-pointer relative transition-all duration-300 hover:border-slate-300`}
                         >
                             <div className="flex justify-between items-start mb-4">
                                 <div className="flex items-center gap-3">
@@ -650,7 +684,7 @@ function App() {
 
             {/* VIEW: FULL SCREEN MODULES */}
             {activeView !== 'home' && (
-                <div className="h-full w-full animate-in fade-in zoom-in-95 duration-200">
+                <div className="h-full w-full">
                     {activeView === 'graph_full' && (
                          <>
                             {/* Overlay UI for Graph View */}

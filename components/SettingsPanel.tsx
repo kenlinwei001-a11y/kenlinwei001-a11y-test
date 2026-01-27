@@ -6,9 +6,9 @@ import {
   Search, ArrowLeft, ArrowRight, Check, Trash2, FileText, FileSpreadsheet, 
   AlertCircle, CheckCircle2, RefreshCw, Zap, Link as LinkIcon, Variable, 
   ChevronRight, Sparkles, Terminal, FileType, GitFork, Layers, Plug, Activity,
-  Palette
+  Palette, Grid, Columns, Monitor, LayoutTemplate
 } from 'lucide-react';
-import { LLMConfig, DataSourceConfig, DataPipelineConfig, ObjectTypeDef, AISkill, ThemeConfig } from '../types';
+import { LLMConfig, DataSourceConfig, DataPipelineConfig, ObjectTypeDef, AISkill, ThemeConfig, LayoutMode } from '../types';
 
 interface Props {
   currentConfig: LLMConfig;
@@ -222,25 +222,53 @@ const SettingsPanel: React.FC<Props> = ({ currentConfig, themeConfig, onConfigSa
      </div>
   );
 
-  // 5. Layout Configuration (New)
+  // 5. Layout Configuration (Updated with more solid colors)
   const renderLayoutConfig = () => {
       if (!themeConfig || !onThemeChange) return null;
 
       const ColorPicker = ({ label, value, onChange, options }: { label: string, value: string, onChange: (v: string) => void, options: {class: string, name: string}[] }) => (
           <div className="bg-white border border-slate-200 rounded-xl p-4">
               <label className="block text-sm font-bold text-slate-700 mb-3">{label}</label>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-3">
                   {options.map((opt) => (
                       <button
                         key={opt.class}
                         onClick={() => onChange(opt.class)}
-                        className={`w-10 h-10 rounded-full border-2 transition-all flex items-center justify-center ${value === opt.class ? 'border-slate-800 ring-2 ring-slate-200' : 'border-transparent hover:scale-110'}`}
-                        style={{ backgroundColor: opt.class.startsWith('bg-[#') ? opt.class.slice(4, -1) : undefined }} // Simple inline style fallback for hex, otherwise rely on class
+                        className={`w-10 h-10 rounded-full border-2 transition-all flex items-center justify-center shadow-sm hover:shadow-md ${value === opt.class ? 'border-slate-800 ring-2 ring-slate-200 scale-110' : 'border-slate-100 hover:scale-110'}`}
+                        style={{ backgroundColor: opt.class.startsWith('bg-[#') ? opt.class.slice(4, -1) : undefined }}
                         title={opt.name}
                       >
-                          {/* Use a div for tailwind classes if inline style fails */}
                           <div className={`w-full h-full rounded-full ${opt.class}`}></div>
-                          {value === opt.class && <Check size={16} className={opt.class.includes('slate-900') || opt.class.includes('emerald-600') ? 'text-white' : 'text-slate-800'} />}
+                          {value === opt.class && <Check size={16} className={['bg-white', 'bg-slate-50', 'bg-gray-50', 'bg-[#eff6ff]', 'bg-[#fff1f2]', 'bg-[#FEF3C7]'].some(c => opt.class.includes(c)) ? 'text-slate-800' : 'text-white'} />}
+                      </button>
+                  ))}
+              </div>
+          </div>
+      );
+
+      const LayoutSelector = () => (
+          <div className="bg-white border border-slate-200 rounded-xl p-5 mb-4">
+              <label className="block text-sm font-bold text-slate-700 mb-3">仪表盘布局模式 (Layout Mode)</label>
+              <div className="grid grid-cols-3 gap-4">
+                  {[
+                      { id: 'bento', label: '标准 Bento', desc: '经典 12 格网格布局', icon: Grid },
+                      { id: 'cinematic', label: '影院宽屏', desc: '全景拓扑图置顶', icon: Monitor },
+                      { id: 'balanced', label: '左右均衡', desc: '左右对比分析', icon: Columns }
+                  ].map((mode) => (
+                      <button
+                          key={mode.id}
+                          onClick={() => onThemeChange({...themeConfig, layoutMode: mode.id as LayoutMode})}
+                          className={`flex flex-col items-center p-4 rounded-xl border-2 transition-all text-center relative overflow-hidden group ${
+                              themeConfig.layoutMode === mode.id 
+                              ? 'border-indigo-600 bg-indigo-50/50 text-indigo-700 shadow-sm' 
+                              : 'border-slate-100 hover:border-slate-300 text-slate-500 hover:bg-slate-50'
+                          }`}
+                      >
+                          <div className={`p-2 rounded-lg mb-2 ${themeConfig.layoutMode === mode.id ? 'bg-white shadow-sm' : 'bg-slate-100 group-hover:bg-white'}`}>
+                              <mode.icon size={24}/>
+                          </div>
+                          <span className="font-bold text-sm">{mode.label}</span>
+                          <span className="text-xs opacity-70 mt-1">{mode.desc}</span>
                       </button>
                   ))}
               </div>
@@ -251,24 +279,41 @@ const SettingsPanel: React.FC<Props> = ({ currentConfig, themeConfig, onConfigSa
           <div className="space-y-6 animate-in fade-in slide-in-from-right-4">
               <div className="bg-slate-50 border border-slate-200 p-5 rounded-xl flex items-center gap-4">
                   <div className="p-3 bg-white rounded-lg border border-slate-200 text-indigo-600 shadow-sm">
-                      <Palette size={24}/>
+                      <LayoutTemplate size={24}/>
                   </div>
                   <div>
-                      <h3 className="text-base font-bold text-slate-800">首页布局与配色</h3>
-                      <p className="text-sm text-slate-500">自定义 Bento Grid 卡片的背景风格，打造专属指挥舱。</p>
+                      <h3 className="text-base font-bold text-slate-800">界面个性化 (UI Customization)</h3>
+                      <p className="text-sm text-slate-500">自定义布局结构与主题色彩，适配不同场景需求。</p>
                   </div>
               </div>
 
+              {/* Layout Selector */}
+              <LayoutSelector />
+
               <div className="grid grid-cols-1 gap-4">
                   <ColorPicker 
-                    label="全景拓扑 (Hero Card)" 
+                    label="全景拓扑卡片 (Hero Card)" 
                     value={themeConfig.heroColor}
                     onChange={(v) => onThemeChange({...themeConfig, heroColor: v})}
                     options={[
                         { class: 'bg-emerald-600', name: 'Emerald' },
-                        { class: 'bg-slate-900', name: 'Dark Slate' },
-                        { class: 'bg-indigo-600', name: 'Indigo' },
+                        { class: 'bg-green-700', name: 'Forest' },
+                        { class: 'bg-teal-600', name: 'Teal' },
+                        { class: 'bg-cyan-600', name: 'Cyan' },
+                        { class: 'bg-sky-600', name: 'Sky' },
                         { class: 'bg-blue-600', name: 'Blue' },
+                        { class: 'bg-indigo-600', name: 'Indigo' },
+                        { class: 'bg-violet-600', name: 'Violet' },
+                        { class: 'bg-purple-600', name: 'Purple' },
+                        { class: 'bg-fuchsia-700', name: 'Fuchsia' },
+                        { class: 'bg-pink-600', name: 'Pink' },
+                        { class: 'bg-rose-600', name: 'Rose' },
+                        { class: 'bg-red-700', name: 'Red' },
+                        { class: 'bg-orange-600', name: 'Orange' },
+                        { class: 'bg-amber-600', name: 'Amber' },
+                        { class: 'bg-slate-900', name: 'Slate' },
+                        { class: 'bg-zinc-900', name: 'Zinc' },
+                        { class: 'bg-[#0f172a]', name: 'Midnight' },
                     ]}
                   />
                   <ColorPicker 
@@ -279,6 +324,10 @@ const SettingsPanel: React.FC<Props> = ({ currentConfig, themeConfig, onConfigSa
                         { class: 'bg-slate-900', name: 'Slate Dark' },
                         { class: 'bg-zinc-900', name: 'Zinc Dark' },
                         { class: 'bg-[#0f172a]', name: 'Midnight' },
+                        { class: 'bg-stone-800', name: 'Stone' },
+                        { class: 'bg-neutral-800', name: 'Neutral' },
+                        { class: 'bg-blue-950', name: 'Navy' },
+                        { class: 'bg-indigo-950', name: 'Deep Indigo' },
                     ]}
                   />
                   <ColorPicker 
@@ -286,10 +335,15 @@ const SettingsPanel: React.FC<Props> = ({ currentConfig, themeConfig, onConfigSa
                     value={themeConfig.productionColor}
                     onChange={(v) => onThemeChange({...themeConfig, productionColor: v})}
                     options={[
-                        { class: 'bg-[#FEF3C7]', name: 'Bright Orange Yellow (Amber 100)' },
-                        { class: 'bg-[#fff1f2]', name: 'Soft Rose' },
+                        { class: 'bg-[#fff1f2]', name: 'Rose Tint' },
+                        { class: 'bg-[#FEF3C7]', name: 'Amber Tint' },
+                        { class: 'bg-orange-50', name: 'Orange Tint' },
+                        { class: 'bg-red-50', name: 'Red Tint' },
                         { class: 'bg-white', name: 'White' },
-                        { class: 'bg-orange-50', name: 'Subtle Orange' },
+                        { class: 'bg-stone-50', name: 'Stone Tint' },
+                        { class: 'bg-zinc-50', name: 'Zinc Tint' },
+                        { class: 'bg-purple-50', name: 'Lavender Tint' },
+                        { class: 'bg-lime-50', name: 'Lime Tint' },
                     ]}
                   />
                   <ColorPicker 
@@ -297,10 +351,29 @@ const SettingsPanel: React.FC<Props> = ({ currentConfig, themeConfig, onConfigSa
                     value={themeConfig.inventoryColor}
                     onChange={(v) => onThemeChange({...themeConfig, inventoryColor: v})}
                     options={[
-                        { class: 'bg-[#eff6ff]', name: 'Light Blue' },
-                        { class: 'bg-slate-50', name: 'Light Slate' },
+                        { class: 'bg-[#eff6ff]', name: 'Blue Tint' },
+                        { class: 'bg-slate-50', name: 'Slate Tint' },
                         { class: 'bg-white', name: 'White' },
                         { class: 'bg-indigo-50', name: 'Indigo Tint' },
+                        { class: 'bg-sky-50', name: 'Sky Tint' },
+                        { class: 'bg-cyan-50', name: 'Cyan Tint' },
+                        { class: 'bg-teal-50', name: 'Teal Tint' },
+                        { class: 'bg-emerald-50', name: 'Emerald Tint' },
+                        { class: 'bg-violet-50', name: 'Violet Tint' },
+                    ]}
+                  />
+                  <ColorPicker 
+                    label="产销协同 (Sales)" 
+                    value={themeConfig.salesColor}
+                    onChange={(v) => onThemeChange({...themeConfig, salesColor: v})}
+                    options={[
+                        { class: 'bg-white', name: 'White' },
+                        { class: 'bg-slate-50', name: 'Slate Tint' },
+                        { class: 'bg-gray-50', name: 'Gray Tint' },
+                        { class: 'bg-[#fafafa]', name: 'Neutral White' },
+                        { class: 'bg-blue-50', name: 'Blue Tint' },
+                        { class: 'bg-green-50', name: 'Green Tint' },
+                        { class: 'bg-orange-50', name: 'Orange Tint' },
                     ]}
                   />
               </div>

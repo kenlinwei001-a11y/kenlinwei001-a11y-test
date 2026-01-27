@@ -142,7 +142,10 @@ export interface LLMConfig {
 }
 
 // Theme Configuration
+export type LayoutMode = 'bento' | 'cinematic' | 'balanced';
+
 export interface ThemeConfig {
+  layoutMode: LayoutMode;
   heroColor: string;
   operationsColor: string;
   productionColor: string;
