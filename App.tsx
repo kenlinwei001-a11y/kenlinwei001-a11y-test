@@ -1,29 +1,39 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Layers, Database, Activity, Share2, Menu } from 'lucide-react';
+import { Layers, Database, Activity, Share2, Menu, Play, RotateCcw, MessageSquare, LayoutDashboard, Settings2, Sliders, ChevronLeft, Zap, GitBranch, Settings, Package, ShoppingCart, Factory, AlertTriangle } from 'lucide-react';
 import { GoogleGenAI, Type } from "@google/genai";
 import SupplyChainGraph from './components/SupplyChainGraph';
 import ConstraintPanel from './components/ConstraintPanel';
 import AIChat from './components/AIChat';
+import DashboardPanel from './components/DashboardPanel';
+import InventoryPanel from './components/InventoryPanel';
+import SalesPanel from './components/SalesPanel';
+import ProductionMonitorPanel from './components/ProductionMonitorPanel';
 import Tooltip from './components/Tooltip';
 import AnomalyAnalysisModal from './components/AnomalyAnalysisModal';
 import { MOCK_DATA, INITIAL_CONSTRAINTS } from './constants';
-import { GraphData, NodeData, ConstraintCategory, ScenarioConfig, ChatMessage, NodeType, ConstraintItem } from './types';
+import { GraphData, NodeData, ConstraintCategory, ScenarioConfig, ChatMessage, ConstraintItem } from './types';
 
 function App() {
   const [constraints, setConstraints] = useState<ConstraintCategory[]>(INITIAL_CONSTRAINTS);
   const [graphData, setGraphData] = useState<GraphData>(MOCK_DATA);
   const [hoveredNode, setHoveredNode] = useState<{ node: NodeData | null; x: number; y: number }>({ node: null, x: 0, y: 0 });
-  const [selectedAnomalyNode, setSelectedAnomalyNode] = useState<NodeData | null>(null);
-  const [dimensions, setDimensions] = useState({ width: window.innerWidth - 680, height: window.innerHeight - 60 });
+  
+  // Selection State for Multi-Node Analysis
+  const [selectedNodes, setSelectedNodes] = useState<NodeData[]>([]);
+  const [isAnalysisModalOpen, setIsAnalysisModalOpen] = useState(false);
+
+  // Panel State (Left Sidebar)
+  const [activePanel, setActivePanel] = useState<'none' | 'scenario' | 'config' | 'dashboard' | 'chat' | 'inventory' | 'sales' | 'production'>('none');
+
+  const [dimensions, setDimensions] = useState({ width: window.innerWidth, height: window.innerHeight - 64 }); 
   
   const tooltipTimeoutRef = useRef<any>(null);
 
-  // Chat State moved to App to allow injection of Simulation Reports
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: 'welcome',
       role: 'model',
-      content: '我是您的供应链智能助手。我可以帮助您进行推演，或者从我们的对话中自动学习新的业务规则并添加到知识库中。',
+      content: '我是您的供应链智能助手。您可以勾选图谱中的节点（支持多选），进行联合异常推演。在对话中输入新的规则，我会自动为您沉淀到知识库。',
       timestamp: new Date()
     }
   ]);
@@ -33,13 +43,13 @@ function App() {
   useEffect(() => {
     const handleResize = () => {
       setDimensions({
-        width: window.innerWidth - 680,
+        width: window.innerWidth, 
         height: window.innerHeight - 64
       });
     };
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
-  }, []);
+  }, [activePanel]);
 
   // Cleanup timeout
   useEffect(() => {
@@ -216,7 +226,7 @@ function App() {
     });
   };
 
-  // Run Simulation Logic - UPDATED for Multi-Scenario
+  // Run Simulation Logic
   const handleRunSimulation = async (configs: ScenarioConfig[]) => {
     setIsAiThinking(true);
     
@@ -256,103 +266,11 @@ function App() {
                  }
              });
           }
-
-          // === 场景: 下游需求变更 (Demand Change) ===
-          if (config.type === 'DEMAND_CHANGE') {
-              const changePercent = Number(config.parameters.demandChange) || 0;
-              const isCut = changePercent < 0; 
-
-              // 影响: 客户 -> 基地 (库存/产能)
-              const supplyingLinks = newGraph.links.filter(l => l.target === targetNode.id);
-              supplyingLinks.forEach(link => {
-                  link.status = 'warning'; 
-                  const baseNode = newGraph.nodes.find(n => n.id === link.source);
-                  if (baseNode) {
-                      baseNode.status = 'warning'; 
-                      baseNode.activeAlerts = (baseNode.activeAlerts || 0) + 1;
-                      if (isCut) {
-                          const increaseFactor = 1 + (Math.abs(changePercent) / 100);
-                          baseNode.inventoryLevel = Math.floor((baseNode.inventoryLevel || 5000) * increaseFactor);
-                      }
-                  }
-              });
-          }
-
-          // === 场景: 产线故障/库存异常 (Production/Inventory) ===
-          if (config.type === 'PRODUCTION_ISSUE' || config.type === 'INVENTORY_ISSUE') {
-              // 影响: 基地 -> 客户 (交付风险)
-              const baseToCustomerLinks = newGraph.links.filter(l => l.source === targetNode.id);
-              baseToCustomerLinks.forEach(l => {
-                  l.status = 'critical';
-                  const custNode = newGraph.nodes.find(n => n.id === l.target);
-                  if (custNode) {
-                      custNode.status = 'warning';
-                      custNode.activeAlerts = (custNode.activeAlerts || 0) + 1;
-                  }
-              });
-          }
         }
     });
 
     setGraphData(newGraph);
-
-    // Call Gemini for the Detailed Report
-    try {
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
-        
-        const scenarioDescriptions = configs.map(c => `- ${c.description} (类型: ${c.type})`).join('\n');
-
-        const prompt = `
-        【任务】
-        用户在锂电供应链数字孪生系统中触发了"联合推演"。系统同时发生了以下多个事件，请进行深度分析并生成决策方案。
-        
-        【事件列表】
-        ${scenarioDescriptions}
-
-        【生成要求】
-        请提供 **3个综合应对方案** (方案A: 保守/低成本, 方案B: 激进/保交付, 方案C: 折中/平衡)。
-        
-        对于每个方案，必须包含以下三个部分：
-        
-        1. **方案描述**: 具体执行步骤。
-        2. **方案数据比对 (Data Comparison)**: 
-           - 预计额外成本 (Estimate Cost)
-           - 订单满足率 (Fulfillment Rate)
-           - 风险指数 (Risk Level)
-        3. **推理链条 (Inference Chain)**: 
-           展示你是如何得出该方案的。格式如下：
-           - **触发数据 (Trigger)**: [列出导致该决策的关键数据，如库存缺口、延期天数]
-           - **引用规则 (Rule)**: [列出依据的业务规则，如"安全库存红线"、"战略客户优先"]
-           - **计算逻辑 (Logic)**: [简述推演逻辑，如"因A产线停机，调用B产线余量覆盖缺口"]
-           - **推演结果 (Result)**: [最终效果预测]
-
-        【格式规范】
-        - 采用Markdown格式。
-        - 语气专业、客观、数据导向。
-        - 严禁出现"Palantir"、"Foundry"等字样。
-        `;
-
-        const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash-latest',
-            contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        });
-
-        const report = response.text || "无法生成推演报告。";
-        
-        // Add specific "Simulation Report" message
-        setMessages(prev => [...prev, { 
-            id: Date.now().toString(), 
-            role: 'model', 
-            content: `📊 **联合推演计算完成**\n\n针对 ${configs.length} 个叠加事件的综合分析：\n\n${report}`, 
-            timestamp: new Date() 
-        }]);
-
-    } catch (e) {
-        console.error(e);
-        setMessages(prev => [...prev, { id: Date.now().toString(), role: 'model', content: "推演计算服务连接失败，请检查网络或API Key。", timestamp: new Date() }]);
-    } finally {
-        setIsAiThinking(false);
-    }
+    setIsAiThinking(false);
   };
 
   const handleConstraintToggle = (categoryId: string, itemId: string) => {
@@ -370,14 +288,12 @@ function App() {
 
   const onNodeHover = useCallback((node: NodeData | null, x: number, y: number) => {
     if (node) {
-        // Clear any existing timeout immediately when entering a new node
         if (tooltipTimeoutRef.current) {
             clearTimeout(tooltipTimeoutRef.current);
             tooltipTimeoutRef.current = null;
         }
         setHoveredNode({ node, x, y });
     } else {
-        // Set a timeout to clear the node after 5 seconds
         if (tooltipTimeoutRef.current) clearTimeout(tooltipTimeoutRef.current);
         tooltipTimeoutRef.current = setTimeout(() => {
             setHoveredNode(prev => ({ ...prev, node: null }));
@@ -385,11 +301,28 @@ function App() {
     }
   }, []);
 
-  const handleDrillDown = useCallback((node: NodeData) => {
-    setSelectedAnomalyNode(node);
+  const handleNodeClick = useCallback((node: NodeData) => {
+    setSelectedNodes(prev => {
+        const exists = prev.find(n => n.id === node.id);
+        if (exists) {
+            // Deselect
+            return prev.filter(n => n.id !== node.id);
+        } else {
+            // Multi-select enabled by default
+            return [...prev, node];
+        }
+    });
   }, []);
 
-  // Handlers for Tooltip interaction
+  const handleBackgroundClick = useCallback(() => {
+    setSelectedNodes([]);
+  }, []);
+
+  const handleSelectAllRisks = () => {
+      const riskyNodes = graphData.nodes.filter(n => n.status === 'warning' || n.status === 'critical');
+      setSelectedNodes(riskyNodes);
+  };
+
   const onTooltipEnter = useCallback(() => {
     if (tooltipTimeoutRef.current) {
         clearTimeout(tooltipTimeoutRef.current);
@@ -404,10 +337,14 @@ function App() {
     }, 5000);
   }, []);
 
+  const togglePanel = (panel: 'scenario' | 'config' | 'dashboard' | 'chat' | 'inventory' | 'sales' | 'production') => {
+      setActivePanel(prev => prev === panel ? 'none' : panel);
+  };
+
   return (
     <div className="flex flex-col h-screen bg-slate-100 overflow-hidden">
       {/* Header */}
-      <header className="h-16 bg-white border-b border-slate-200 flex items-center px-6 justify-between shadow-sm z-10 flex-shrink-0">
+      <header className="h-16 bg-white border-b border-slate-200 flex items-center px-6 justify-between shadow-sm z-30 relative shrink-0">
         <div className="flex items-center gap-3">
           <div className="p-2 bg-indigo-600 rounded text-white">
             <Share2 size={20} />
@@ -439,79 +376,234 @@ function App() {
         </div>
       </header>
 
-      {/* Main Content Area */}
-      <div className="flex flex-1 overflow-hidden relative">
+      {/* Main Container */}
+      <div className="flex-1 relative overflow-hidden flex flex-row">
         
-        {/* Left Panel: Constraints & Scenarios */}
-        <div className="w-80 flex-shrink-0 h-full z-20">
-          <ConstraintPanel 
-            constraints={constraints} 
-            nodes={graphData.nodes}
-            onToggleConstraint={handleConstraintToggle}
-            onRunSimulation={handleRunSimulation}
-            onAnalyzeConstraint={handleAnalyzeConstraint}
-            onAddConstraint={handleAddConstraint}
-            isSimulating={isAiThinking}
-          />
+        {/* Left Dock / Navigation Bar - FOUNDRY STYLE */}
+        <div className="w-14 bg-[#111827] border-r border-[#1f2937] z-40 flex flex-col items-center py-4 gap-4 shadow-xl shrink-0 overflow-y-auto no-scrollbar">
+            {/* Top Group: Simulation Tools */}
+            <div className="flex flex-col gap-2 w-full px-2">
+                 <button 
+                    onClick={() => togglePanel('scenario')}
+                    className={`w-10 h-10 rounded-lg flex items-center justify-center transition-all duration-200 group relative ${activePanel === 'scenario' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}
+                >
+                    <Zap size={20} strokeWidth={activePanel === 'scenario' ? 2.5 : 2} />
+                    <span className="absolute left-full ml-3 top-1/2 -translate-y-1/2 bg-slate-900 text-white text-[10px] font-bold px-2 py-1 rounded border border-slate-700 opacity-0 group-hover:opacity-100 whitespace-nowrap pointer-events-none transition-opacity shadow-xl z-50">
+                        场景模拟 (Scenario)
+                    </span>
+                </button>
+
+                 <button 
+                    onClick={() => togglePanel('config')}
+                    className={`w-10 h-10 rounded-lg flex items-center justify-center transition-all duration-200 group relative ${activePanel === 'config' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}
+                >
+                    <Settings size={20} strokeWidth={activePanel === 'config' ? 2.5 : 2} />
+                    <span className="absolute left-full ml-3 top-1/2 -translate-y-1/2 bg-slate-900 text-white text-[10px] font-bold px-2 py-1 rounded border border-slate-700 opacity-0 group-hover:opacity-100 whitespace-nowrap pointer-events-none transition-opacity shadow-xl z-50">
+                        推演配置 (Configuration)
+                    </span>
+                </button>
+            </div>
+
+            <div className="w-8 h-px bg-slate-700/50 my-1"></div>
+
+            {/* Middle Group: Monitoring (NEW ICONS ADDED HERE) */}
+            <div className="flex flex-col gap-2 w-full px-2">
+                 <button 
+                    onClick={() => togglePanel('dashboard')}
+                    className={`w-10 h-10 rounded-lg flex items-center justify-center transition-all duration-200 group relative ${activePanel === 'dashboard' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}
+                >
+                    <LayoutDashboard size={20} strokeWidth={activePanel === 'dashboard' ? 2.5 : 2} />
+                    <span className="absolute left-full ml-3 top-1/2 -translate-y-1/2 bg-slate-900 text-white text-[10px] font-bold px-2 py-1 rounded border border-slate-700 opacity-0 group-hover:opacity-100 whitespace-nowrap pointer-events-none transition-opacity shadow-xl z-50">
+                        全景看板 (Dashboard)
+                    </span>
+                </button>
+
+                {/* 1. Inventory Monitor */}
+                 <button 
+                    onClick={() => togglePanel('inventory')}
+                    className={`w-10 h-10 rounded-lg flex items-center justify-center transition-all duration-200 group relative ${activePanel === 'inventory' ? 'bg-purple-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}
+                >
+                    <Package size={20} strokeWidth={activePanel === 'inventory' ? 2.5 : 2} />
+                    <span className="absolute left-full ml-3 top-1/2 -translate-y-1/2 bg-slate-900 text-white text-[10px] font-bold px-2 py-1 rounded border border-slate-700 opacity-0 group-hover:opacity-100 whitespace-nowrap pointer-events-none transition-opacity shadow-xl z-50">
+                        库存滚动监控 (Inventory)
+                    </span>
+                </button>
+
+                {/* 2. Sales Forecast */}
+                 <button 
+                    onClick={() => togglePanel('sales')}
+                    className={`w-10 h-10 rounded-lg flex items-center justify-center transition-all duration-200 group relative ${activePanel === 'sales' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}
+                >
+                    <ShoppingCart size={20} strokeWidth={activePanel === 'sales' ? 2.5 : 2} />
+                    <span className="absolute left-full ml-3 top-1/2 -translate-y-1/2 bg-slate-900 text-white text-[10px] font-bold px-2 py-1 rounded border border-slate-700 opacity-0 group-hover:opacity-100 whitespace-nowrap pointer-events-none transition-opacity shadow-xl z-50">
+                        产销计划 (S&OP)
+                    </span>
+                </button>
+
+                {/* 3. Production Lines */}
+                 <button 
+                    onClick={() => togglePanel('production')}
+                    className={`w-10 h-10 rounded-lg flex items-center justify-center transition-all duration-200 group relative ${activePanel === 'production' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}
+                >
+                    <Factory size={20} strokeWidth={activePanel === 'production' ? 2.5 : 2} />
+                    <span className="absolute left-full ml-3 top-1/2 -translate-y-1/2 bg-slate-900 text-white text-[10px] font-bold px-2 py-1 rounded border border-slate-700 opacity-0 group-hover:opacity-100 whitespace-nowrap pointer-events-none transition-opacity shadow-xl z-50">
+                        产线工序监控 (MES)
+                    </span>
+                </button>
+            </div>
+
+            <div className="flex-1"></div>
+
+            {/* Bottom Group: Assistant */}
+            <button 
+                onClick={() => togglePanel('chat')}
+                className={`w-10 h-10 rounded-lg flex items-center justify-center transition-all duration-200 group relative ${activePanel === 'chat' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}
+            >
+                <MessageSquare size={20} strokeWidth={activePanel === 'chat' ? 2.5 : 2} />
+                 <span className="absolute left-full ml-3 top-1/2 -translate-y-1/2 bg-slate-900 text-white text-[10px] font-bold px-2 py-1 rounded border border-slate-700 opacity-0 group-hover:opacity-100 whitespace-nowrap pointer-events-none transition-opacity shadow-xl z-50">
+                    智能助手 (AI Copilot)
+                </span>
+            </button>
         </div>
 
-        {/* Center Canvas: Graph */}
-        <div className="flex-1 bg-slate-50 relative overflow-hidden h-full">
-           <div className="absolute top-4 left-4 z-10 pointer-events-none">
+        {/* Slide-out Panel Container (Left Side) */}
+        {activePanel !== 'none' && (
+             <div 
+                className="absolute left-14 top-0 bottom-0 z-30 bg-white border-r border-slate-200 shadow-2xl transition-transform duration-300 ease-in-out transform translate-x-0"
+                style={{ width: ['dashboard', 'inventory', 'sales', 'production'].includes(activePanel) ? '480px' : '400px' }}
+             >
+                 {/* Close Handle (Right side of panel) */}
+                 <div 
+                    onClick={() => setActivePanel('none')}
+                    className="absolute top-1/2 -right-4 w-4 h-12 bg-white border border-slate-200 border-l-0 rounded-r-md flex items-center justify-center cursor-pointer hover:bg-slate-50 text-slate-400 shadow-sm"
+                 >
+                     <ChevronLeft size={14} />
+                 </div>
+
+                 {/* Panel Content */}
+                 <div className="h-full w-full overflow-hidden">
+                    {(activePanel === 'config' || activePanel === 'scenario') && (
+                        <ConstraintPanel 
+                            constraints={constraints} 
+                            nodes={graphData.nodes}
+                            onToggleConstraint={handleConstraintToggle}
+                            onRunSimulation={handleRunSimulation}
+                            onAnalyzeConstraint={handleAnalyzeConstraint}
+                            onAddConstraint={handleAddConstraint}
+                            isSimulating={isAiThinking}
+                            initialTab={activePanel === 'scenario' ? 'scenarios' : 'constraints'}
+                        />
+                    )}
+                    {activePanel === 'dashboard' && <DashboardPanel data={graphData} />}
+                    {activePanel === 'inventory' && <InventoryPanel />}
+                    {activePanel === 'sales' && <SalesPanel />}
+                    {activePanel === 'production' && <ProductionMonitorPanel />}
+                    {activePanel === 'chat' && (
+                         <AIChat 
+                            messages={messages} 
+                            onSendMessage={handleUserMessage}
+                            isThinking={isAiThinking}
+                        />
+                    )}
+                 </div>
+             </div>
+        )}
+
+        {/* Graph Area (Takes remaining space) */}
+        <div className="flex-1 bg-slate-50 relative h-full">
+           <div className="absolute top-4 left-4 z-10 pointer-events-none select-none">
               <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">供应链全景视图</h2>
-              <div className="flex gap-4">
-                 <div className="flex items-center gap-1.5">
-                    <div className="w-3 h-3 rounded-full bg-[#22c55e] border border-white shadow-sm"></div>
-                    <span className="text-xs text-slate-600 font-medium">供应商</span>
-                 </div>
-                 <div className="flex items-center gap-1.5">
-                    <div className="w-3 h-3 rounded bg-[#a855f7] border border-white shadow-sm"></div>
-                    <span className="text-xs text-slate-600 font-medium">生产基地</span>
-                 </div>
-                 <div className="flex items-center gap-1.5">
-                    <div className="w-3 h-3 bg-[#3b82f6] border border-white shadow-sm rotate-45 transform scale-75"></div>
-                    <span className="text-xs text-slate-600 font-medium">客户交付</span>
-                 </div>
-                  <div className="flex items-center gap-1.5 pl-4 border-l border-slate-300 ml-2">
-                    <div className="w-3 h-3 rounded-full bg-red-500 animate-pulse border border-white shadow-sm"></div>
-                    <span className="text-xs text-red-600 font-bold">异常/延期</span>
-                 </div>
+              <div className="flex flex-col gap-2 items-start mt-1">
+                <div className="flex gap-4">
+                    <div className="flex items-center gap-1.5">
+                        <div className="w-3 h-3 rounded-full bg-[#22c55e] border border-white shadow-sm"></div>
+                        <span className="text-xs text-slate-600 font-medium">供应商</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                        <div className="w-3 h-3 rounded bg-[#a855f7] border border-white shadow-sm"></div>
+                        <span className="text-xs text-slate-600 font-medium">生产基地</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                        <div className="w-3 h-3 bg-[#3b82f6] border border-white shadow-sm rotate-45 transform scale-75"></div>
+                        <span className="text-xs text-slate-600 font-medium">客户交付</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 pl-4 border-l border-slate-300 ml-2">
+                        <div className="w-3 h-3 rounded-full bg-red-500 animate-pulse border border-white shadow-sm"></div>
+                        <span className="text-xs text-red-600 font-bold">异常/延期</span>
+                    </div>
+                </div>
+                {/* Quick Action for Batch Selection */}
+                <button 
+                    onClick={handleSelectAllRisks}
+                    className="flex items-center gap-1.5 bg-white/80 backdrop-blur-sm border border-slate-200 px-3 py-1.5 rounded-full shadow-sm text-[10px] font-bold text-red-600 hover:bg-white transition-colors cursor-pointer pointer-events-auto"
+                >
+                    <AlertTriangle size={12}/> 
+                    一键选中所有风险节点 (批量推演)
+                </button>
               </div>
            </div>
 
            <SupplyChainGraph 
              data={graphData} 
              onNodeHover={onNodeHover}
+             onNodeClick={handleNodeClick}
+             onBackgroundClick={handleBackgroundClick}
+             selectedNodeIds={selectedNodes.map(n => n.id)}
              width={dimensions.width}
              height={dimensions.height}
            />
            
-           {/* Floating Tooltip */}
            <Tooltip 
              node={hoveredNode.node} 
              position={hoveredNode.node ? { x: hoveredNode.x, y: hoveredNode.y } : null} 
-             onDrillDown={handleDrillDown}
+             onDrillDown={handleNodeClick} 
              onMouseEnter={onTooltipEnter}
              onMouseLeave={onTooltipLeave}
            />
-        </div>
 
-        {/* Right Panel: AI Chat */}
-        <div className="w-96 flex-shrink-0 h-full border-l border-slate-200 z-20">
-           <AIChat 
-                messages={messages} 
-                onSendMessage={handleUserMessage}
-                isThinking={isAiThinking}
-           />
+           {/* Floating Action Bar for Multi-Node Analysis */}
+           {selectedNodes.length > 0 && (
+               <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 z-20 animate-in slide-in-from-bottom-4 fade-in duration-300">
+                   <div className="bg-slate-900/90 backdrop-blur-md text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-6 border border-slate-700/50">
+                       <div className="flex items-center gap-3">
+                           <div className="bg-blue-600 rounded-full w-8 h-8 flex items-center justify-center font-bold text-sm shadow-inner">
+                               {selectedNodes.length}
+                           </div>
+                           <div className="flex flex-col">
+                               <span className="text-sm font-bold">已选异常节点 (Multi-Select)</span>
+                               <span className="text-[10px] text-slate-400">点击图谱可继续添加节点</span>
+                           </div>
+                       </div>
+                       
+                       <div className="h-8 w-px bg-slate-700"></div>
+
+                       <div className="flex gap-2">
+                           <button 
+                               onClick={() => setSelectedNodes([])}
+                               className="px-3 py-2 text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-800 rounded-lg transition-colors flex items-center gap-1"
+                           >
+                               <RotateCcw size={14} /> 清空
+                           </button>
+                           <button 
+                               onClick={() => setIsAnalysisModalOpen(true)}
+                               className="px-5 py-2 text-sm font-bold bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 rounded-full shadow-lg transition-all transform hover:scale-105 flex items-center gap-2"
+                           >
+                               <Play size={16} fill="currentColor" />
+                               执行联合推演
+                           </button>
+                       </div>
+                   </div>
+               </div>
+           )}
         </div>
       </div>
 
-      {/* Anomaly Analysis Modal Overlay */}
-      {selectedAnomalyNode && (
+      {/* Joint Anomaly Analysis Modal Overlay */}
+      {isAnalysisModalOpen && selectedNodes.length > 0 && (
         <AnomalyAnalysisModal 
-          node={selectedAnomalyNode} 
+          nodes={selectedNodes} 
           graph={graphData} 
-          onClose={() => setSelectedAnomalyNode(null)} 
+          onClose={() => setIsAnalysisModalOpen(false)} 
           onAddConstraint={handleAddConstraint}
         />
       )}

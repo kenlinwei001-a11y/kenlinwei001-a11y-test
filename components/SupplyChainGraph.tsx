@@ -1,28 +1,39 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 import * as d3 from 'd3';
 import { GraphData, NodeData, NodeType } from '../types';
 
 interface Props {
   data: GraphData;
   onNodeHover: (node: NodeData | null, x: number, y: number) => void;
+  onNodeClick?: (node: NodeData) => void;
+  onBackgroundClick?: () => void;
+  selectedNodeIds?: string[];
   width: number;
   height: number;
 }
 
-const SupplyChainGraph: React.FC<Props> = ({ data, onNodeHover, width, height }) => {
+const SupplyChainGraph: React.FC<Props> = ({ data, onNodeHover, onNodeClick, onBackgroundClick, selectedNodeIds = [], width, height }) => {
   const svgRef = useRef<SVGSVGElement>(null);
-  
+  // Ref to persist simulation nodes state (positions) across renders
+  const simulationStateRef = useRef<d3.SimulationNodeDatum[]>([]);
+
   useEffect(() => {
     if (!svgRef.current || !data.nodes.length) return;
 
-    // CRITICAL FIX: Deep clone data to prevent D3 from mutating the original props/state.
-    // D3 replaces string IDs in 'links' with object references. If we reuse mutated data
-    // in subsequent renders (React StrictMode), D3 crashes or links disappear.
-    const simulationNodes = JSON.parse(JSON.stringify(data.nodes));
+    // 1. Prepare Simulation Nodes
+    // Try to preserve x/y/vx/vy from previous simulation to prevent "exploding" resets
+    const simulationNodes = data.nodes.map(n => {
+      const prev = simulationStateRef.current.find((p: any) => p.id === n.id);
+      if (prev) {
+        return { ...n, x: prev.x, y: prev.y, vx: prev.vx, vy: prev.vy };
+      }
+      return { ...n };
+    }) as d3.SimulationNodeDatum[];
+
     const simulationLinks = JSON.parse(JSON.stringify(data.links));
 
     const svg = d3.select(svgRef.current);
-    svg.selectAll("*").remove(); // Clear previous render
+    svg.selectAll("*").remove(); 
 
     // Groups
     const g = svg.append("g");
@@ -30,35 +41,45 @@ const SupplyChainGraph: React.FC<Props> = ({ data, onNodeHover, width, height })
     // Zoom behavior
     const zoom = d3.zoom<SVGSVGElement, unknown>()
       .scaleExtent([0.1, 4])
+      .filter((event) => {
+         // Disable panning on mouse down (drag), allow wheel zoom
+         return event.type === 'wheel';
+      })
       .on("zoom", (event) => {
         g.attr("transform", event.transform);
       });
     
-    svg.call(zoom);
+    svg.call(zoom)
+       .on("click", (event) => {
+           // Check if click was on the background (svg)
+           // event.target is the actual element clicked. If it's the SVG, it's background.
+           if (event.target === svgRef.current && onBackgroundClick) {
+               onBackgroundClick();
+           }
+       });
 
-    // Initial Zoom - adjusted to fit
+    // Initial Zoom (Center)
     const initialScale = 0.85;
     const initialTranslateX = width / 2;
     const initialTranslateY = height / 2;
     svg.call(zoom.transform, d3.zoomIdentity.translate(initialTranslateX - (width * initialScale) / 2, initialTranslateY - (height * initialScale) / 2).scale(initialScale));
 
-
-    // Force Simulation Setup
-    const simulation = d3.forceSimulation(simulationNodes as d3.SimulationNodeDatum[])
-      .force("link", d3.forceLink(simulationLinks).id((d: any) => d.id).distance(180)) // Increased distance slightly
-      .force("charge", d3.forceManyBody().strength(-500))
-      .force("collide", d3.forceCollide(60)) // Avoid overlap with new badges
+    // Force Simulation configuration
+    const simulation = d3.forceSimulation(simulationNodes)
+      .alphaDecay(0.05) // Faster settling (default ~0.0228)
+      .force("link", d3.forceLink(simulationLinks).id((d: any) => d.id).distance(180)) 
+      .force("charge", d3.forceManyBody().strength(-400)) // Reduced strength slightly
+      .force("collide", d3.forceCollide(50)) // Reduced collision radius
       .force("x", d3.forceX((d: any) => {
         if (d.type === NodeType.SUPPLIER) return width * 0.15;
         if (d.type === NodeType.BASE) return width * 0.5;
         return width * 0.85;
-      }).strength(0.8))
-      .force("y", d3.forceY(height / 2).strength(0.1));
+      }).strength(0.5)) // Reduced x-strength for smoother movement
+      .force("y", d3.forceY(height / 2).strength(0.08));
 
-    // Define Arrow markers
+    // Define Markers
     const defs = svg.append("defs");
     
-    // Normal Arrow
     defs.append("marker")
       .attr("id", "arrow-normal")
       .attr("viewBox", "0 -5 10 10")
@@ -71,7 +92,6 @@ const SupplyChainGraph: React.FC<Props> = ({ data, onNodeHover, width, height })
       .attr("d", "M0,-5L10,0L0,5")
       .attr("fill", "#94a3b8");
 
-    // Critical Arrow
     defs.append("marker")
       .attr("id", "arrow-critical")
       .attr("viewBox", "0 -5 10 10")
@@ -84,29 +104,20 @@ const SupplyChainGraph: React.FC<Props> = ({ data, onNodeHover, width, height })
       .attr("d", "M0,-5L10,0L0,5")
       .attr("fill", "#ef4444");
 
-    // Scale for Link Width based on Value (Traffic Heatmap)
     const linkWidthScale = d3.scaleLinear()
-      .domain([0, 5000]) // Based on mock data range
-      .range([1.5, 8]) // Min width 1.5px, Max 8px
+      .domain([0, 5000]) 
+      .range([1.5, 8]) 
       .clamp(true);
 
-    // Links (Curves)
+    // Links
     const link = g.append("g")
       .selectAll("path")
       .data(simulationLinks)
       .enter()
       .append("path")
       .attr("stroke", (d: any) => d.status === 'critical' ? '#ef4444' : d.status === 'warning' ? '#f59e0b' : '#94a3b8')
-      .attr("stroke-opacity", (d: any) => {
-          if (d.status !== 'normal') return 0.9;
-          // Heatmap effect: thicker lines slightly more opaque
-          return 0.3 + (linkWidthScale(d.value) / 10); 
-      })
-      .attr("stroke-width", (d: any) => {
-          // If critical, use a fixed visible width. If normal, use traffic volume.
-          if (d.status !== 'normal') return 3;
-          return linkWidthScale(d.value);
-      })
+      .attr("stroke-opacity", (d: any) => d.status !== 'normal' ? 0.9 : 0.3 + (linkWidthScale(d.value) / 10))
+      .attr("stroke-width", (d: any) => d.status !== 'normal' ? 3 : linkWidthScale(d.value))
       .attr("fill", "none")
       .attr("marker-end", (d: any) => d.status === 'critical' ? "url(#arrow-critical)" : null);
 
@@ -122,17 +133,36 @@ const SupplyChainGraph: React.FC<Props> = ({ data, onNodeHover, width, height })
         .on("drag", dragged)
         .on("end", dragended));
 
-    // Node Visuals - Shapes based on Type
+    // Node Visuals
     node.each(function(d: any) {
       const el = d3.select(this);
+      const isSelected = selectedNodeIds.includes(d.id);
       
       const isCritical = d.status === 'critical';
       const isWarning = d.status === 'warning';
       const strokeColor = isCritical ? '#ef4444' : isWarning ? '#f59e0b' : (d.type === NodeType.SUPPLIER ? '#22c55e' : d.type === NodeType.BASE ? '#a855f7' : '#3b82f6');
       const fillColor = isCritical ? '#fef2f2' : isWarning ? '#fffbeb' : (d.type === NodeType.SUPPLIER ? '#f0fdf4' : d.type === NodeType.BASE ? '#fdf4ff' : '#eff6ff');
 
-      // Pulse effect for critical nodes
-      if (isCritical) {
+      // Selection Halo
+      if (isSelected) {
+          el.append("circle")
+            .attr("r", 28)
+            .attr("fill", "none")
+            .attr("stroke", "#3b82f6")
+            .attr("stroke-width", 2)
+            .attr("stroke-dasharray", "4 2")
+            .attr("opacity", 0.8)
+            .append("animateTransform")
+            .attr("attributeName", "transform")
+            .attr("type", "rotate")
+            .attr("from", "0 0 0")
+            .attr("to", "360 0 0")
+            .attr("dur", "10s")
+            .attr("repeatCount", "indefinite");
+      }
+
+      // Critical Pulse
+      if (isCritical && !isSelected) {
          el.append("circle")
            .attr("r", 20)
            .attr("fill", "#ef4444")
@@ -143,7 +173,7 @@ const SupplyChainGraph: React.FC<Props> = ({ data, onNodeHover, width, height })
            .attr("to", 40)
            .attr("dur", "1.5s")
            .attr("repeatCount", "indefinite")
-           .append("animate") // Fade out
+           .append("animate") 
            .attr("attributeName", "opacity")
            .attr("from", 0.4)
            .attr("to", 0)
@@ -151,15 +181,14 @@ const SupplyChainGraph: React.FC<Props> = ({ data, onNodeHover, width, height })
            .attr("repeatCount", "indefinite");
       }
 
+      // Shapes
       if (d.type === NodeType.CUSTOMER) {
-         // Hexagon for Customer
          el.append("path")
            .attr("d", "M0,-15 L13,-7.5 L13,7.5 L0,15 L-13,7.5 L-13,-7.5 Z")
            .attr("fill", fillColor)
            .attr("stroke", strokeColor)
-           .attr("stroke-width", isCritical ? 3 : 2);
+           .attr("stroke-width", isCritical || isSelected ? 3 : 2);
       } else if (d.type === NodeType.BASE) {
-        // Rectangle for Base
         el.append("rect")
           .attr("x", -15)
           .attr("y", -15)
@@ -168,17 +197,35 @@ const SupplyChainGraph: React.FC<Props> = ({ data, onNodeHover, width, height })
           .attr("rx", 4)
           .attr("fill", fillColor)
           .attr("stroke", strokeColor)
-          .attr("stroke-width", isCritical ? 3 : 2);
+          .attr("stroke-width", isCritical || isSelected ? 3 : 2);
       } else {
-        // Circle for Supplier
         el.append("circle")
           .attr("r", 10)
           .attr("fill", fillColor)
           .attr("stroke", strokeColor)
-          .attr("stroke-width", isCritical ? 3 : 2);
+          .attr("stroke-width", isCritical || isSelected ? 3 : 2);
       }
 
-      // Main Labels
+      // Checkmark
+      if (isSelected) {
+          el.append("circle")
+            .attr("cx", 12)
+            .attr("cy", -12)
+            .attr("r", 8)
+            .attr("fill", "#3b82f6")
+            .attr("stroke", "#ffffff")
+            .attr("stroke-width", 2);
+          
+          el.append("path")
+            .attr("d", "M8,-12 L11,-9 L16,-15") 
+            .attr("fill", "none")
+            .attr("stroke", "white")
+            .attr("stroke-width", 2)
+            .attr("stroke-linecap", "round")
+            .attr("stroke-linejoin", "round");
+      }
+
+      // Label
       el.append("text")
         .text(d.name)
         .attr("y", 25)
@@ -189,7 +236,7 @@ const SupplyChainGraph: React.FC<Props> = ({ data, onNodeHover, width, height })
         .style("pointer-events", "none")
         .style("text-shadow", "0 1px 2px rgba(255,255,255,0.8)");
         
-      if (isCritical || isWarning) {
+      if ((isCritical || isWarning) && !isSelected) {
           el.append("text")
             .text("!")
             .attr("y", 5)
@@ -199,16 +246,14 @@ const SupplyChainGraph: React.FC<Props> = ({ data, onNodeHover, width, height })
             .attr("font-weight", "bold");
       }
 
-      // === Real-time Inventory/Status Badge ===
-      // Display for Supplier and Base
+      // Stats Badge
       if ((d.type === NodeType.SUPPLIER || d.type === NodeType.BASE) && d.inventoryLevel !== undefined) {
          const hasIssue = d.activeAlerts > 0;
          const badgeColor = hasIssue ? "#fee2e2" : "#f8fafc";
          const badgeBorder = hasIssue ? "#ef4444" : "#cbd5e1";
          const badgeText = hasIssue ? "#b91c1c" : "#64748b";
-         const formattedValue = d3.format(".2s")(d.inventoryLevel); // e.g., 2.5k
+         const formattedValue = d3.format(".2s")(d.inventoryLevel); 
 
-         // Badge Background Pill
          el.append("rect")
            .attr("x", -16)
            .attr("y", 30)
@@ -219,7 +264,6 @@ const SupplyChainGraph: React.FC<Props> = ({ data, onNodeHover, width, height })
            .attr("stroke", badgeBorder)
            .attr("stroke-width", 1);
          
-         // Badge Text
          el.append("text")
            .text(formattedValue)
            .attr("x", 0)
@@ -230,70 +274,34 @@ const SupplyChainGraph: React.FC<Props> = ({ data, onNodeHover, width, height })
            .attr("fill", badgeText)
            .style("pointer-events", "none");
       }
-
     });
 
-    // Interaction Events
+    // Events
     node.on("mouseenter", function(event, d: any) {
-      // Highlight Logic
-      const connectedLinkIds = new Set();
-      const connectedNodeIds = new Set();
-      connectedNodeIds.add(d.id);
-
-      // Find connections
-      simulationLinks.forEach((l: any) => {
-        if (l.source.id === d.id) {
-          connectedLinkIds.add(l.index);
-          connectedNodeIds.add(l.target.id);
-        } else if (l.target.id === d.id) {
-          connectedLinkIds.add(l.index);
-          connectedNodeIds.add(l.source.id);
-        }
-      });
-
-      // Visually dim others
-      node.style("opacity", (n: any) => connectedNodeIds.has(n.id) ? 1 : 0.1);
-      link.style("stroke-opacity", (l: any) => connectedLinkIds.has(l.index) ? 0.9 : 0.05);
-      
-      // Expand ring if not critical (critical has its own animation)
-      if (d.status !== 'critical') {
-        // Simple scale up
-        d3.select(this).attr("transform", `translate(${d.x},${d.y}) scale(1.2)`);
-      }
-
-      // IMPORTANT: Find the original node data to pass back, since d is the simulation clone
       const originalNode = data.nodes.find(n => n.id === d.id) || d;
       onNodeHover(originalNode, event.clientX, event.clientY);
-
     }).on("mouseleave", function(event, d: any) {
-      // Reset
-      node.style("opacity", 1);
-      link.style("stroke-opacity", (l: any) => {
-         // Restore heatmap opacity
-         if (l.status !== 'normal') return 0.9;
-         return 0.3 + (linkWidthScale(l.value) / 10);
-      });
-      
-      if (d.status !== 'critical') {
-        d3.select(this).attr("transform", `translate(${d.x},${d.y}) scale(1)`);
-      }
-
       onNodeHover(null, 0, 0);
+    }).on("click", function(event, d: any) {
+      event.stopPropagation();
+      const originalNode = data.nodes.find(n => n.id === d.id) || d;
+      if (onNodeClick) {
+          onNodeClick(originalNode);
+      }
     });
 
-
-    // Tick Function
+    // Simulation Tick
     simulation.on("tick", () => {
       link.attr("d", (d: any) => {
-        // Bezier curve
         const midX = (d.source.x + d.target.x) / 2;
         return `M${d.source.x},${d.source.y} C${midX},${d.source.y} ${midX},${d.target.y} ${d.target.x},${d.target.y}`;
       });
-
       node.attr("transform", (d: any) => `translate(${d.x},${d.y})`);
+      
+      // Update ref with current positions
+      simulationStateRef.current = simulationNodes;
     });
 
-    // Drag functions
     function dragstarted(event: any) {
       if (!event.active) simulation.alphaTarget(0.3).restart();
       event.subject.fx = event.subject.x;
@@ -314,11 +322,11 @@ const SupplyChainGraph: React.FC<Props> = ({ data, onNodeHover, width, height })
     return () => {
       simulation.stop();
     };
-  }, [data, width, height, onNodeHover]);
+  }, [data, width, height, onNodeHover, onNodeClick, onBackgroundClick, selectedNodeIds]);
 
   return (
     <div className="relative w-full h-full">
-        {/* Legend for Heatmap & Inventory */}
+        {/* Legend */}
         <div className="absolute top-4 right-4 z-10 bg-white/90 backdrop-blur border border-slate-200 p-2 rounded shadow-sm text-[10px] text-slate-600 space-y-2 pointer-events-none select-none">
             <div className="font-bold border-b border-slate-100 pb-1 mb-1">图例说明</div>
             <div className="flex items-center gap-2">
@@ -340,7 +348,7 @@ const SupplyChainGraph: React.FC<Props> = ({ data, onNodeHover, width, height })
             width={width} 
             height={height} 
             className="bg-slate-50/50"
-            style={{ cursor: 'grab' }}
+            style={{ cursor: 'default' }} 
         />
     </div>
   );

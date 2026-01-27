@@ -27,8 +27,8 @@ const AIChat: React.FC<Props> = ({ messages, onSendMessage, isThinking }) => {
   };
 
   return (
-    <div className="flex flex-col h-full bg-white border-l border-slate-200 shadow-sm w-96">
-       <div className="p-4 border-b border-slate-200 flex items-center gap-2 bg-gradient-to-r from-slate-50 to-white">
+    <div className="flex flex-col h-full bg-white w-full">
+       <div className="p-4 border-b border-slate-200 flex items-center gap-2 bg-gradient-to-r from-slate-50 to-white sticky top-0 z-10">
         <div className="p-1.5 bg-blue-100 rounded-lg text-blue-600">
            <Sparkles size={18} />
         </div>
@@ -71,7 +71,7 @@ const AIChat: React.FC<Props> = ({ messages, onSendMessage, isThinking }) => {
         <div ref={messagesEndRef} />
       </div>
 
-      <div className="p-4 border-t border-slate-200 bg-white">
+      <div className="p-4 border-t border-slate-200 bg-white sticky bottom-0 z-10">
         <div className="relative">
           <input
             type="text"

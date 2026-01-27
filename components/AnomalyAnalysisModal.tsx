@@ -1,10 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { NodeData, GraphData, ConstraintItem, ChatMessage } from '../types';
-import { X, AlertTriangle, ArrowRight, Activity, Truck, Package, AlertCircle, Calculator, CheckCircle2, Clock, DollarSign, BarChart3, FileText, Bot, User, Send, BrainCircuit, ArrowLeft, GitCommit } from 'lucide-react';
+import { X, AlertTriangle, ArrowRight, Activity, Truck, Package, AlertCircle, Calculator, CheckCircle2, Clock, DollarSign, BarChart3, FileText, Bot, User, Send, BrainCircuit, ArrowLeft, GitCommit, Layers } from 'lucide-react';
 import { GoogleGenAI, Type } from "@google/genai";
 
 interface Props {
-  node: NodeData;
+  nodes: NodeData[]; // Changed from single node to array
   graph: GraphData;
   onClose: () => void;
   onAddConstraint: (item: ConstraintItem) => void;
@@ -31,7 +31,7 @@ interface EmergencyPlan {
   };
 }
 
-const AnomalyAnalysisModal: React.FC<Props> = ({ node, graph, onClose, onAddConstraint }) => {
+const AnomalyAnalysisModal: React.FC<Props> = ({ nodes, graph, onClose, onAddConstraint }) => {
   const [currentView, setCurrentView] = useState<'analysis' | 'planning'>('analysis');
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedPlans, setGeneratedPlans] = useState<EmergencyPlan[]>([]);
@@ -43,8 +43,9 @@ const AnomalyAnalysisModal: React.FC<Props> = ({ node, graph, onClose, onAddCons
   const [isChatThinking, setIsChatThinking] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // 1. Analyze Upstream (Incoming Links)
-  const upstreamLinks = graph.links.filter(l => l.target === node.id);
+  // 1. Analyze Upstream (Incoming Links for ALL selected nodes)
+  const allNodeIds = new Set(nodes.map(n => n.id));
+  const upstreamLinks = graph.links.filter(l => allNodeIds.has(l.target));
   const upstreamData = upstreamLinks.map(l => {
     const sourceNode = graph.nodes.find(n => n.id === l.source);
     return { 
@@ -54,12 +55,13 @@ const AnomalyAnalysisModal: React.FC<Props> = ({ node, graph, onClose, onAddCons
         linkType: l.type,
         status: sourceNode?.status || 'normal',
         inventory: sourceNode?.inventoryLevel,
-        eta: 'T+2' // Mock calculated ETA
+        eta: 'T+2',
+        targetNodeName: nodes.find(n => n.id === l.target)?.name // Which node is affected
     };
   });
 
-  // 2. Analyze Downstream (Outgoing Links)
-  const downstreamLinks = graph.links.filter(l => l.source === node.id);
+  // 2. Analyze Downstream (Outgoing Links for ALL selected nodes)
+  const downstreamLinks = graph.links.filter(l => allNodeIds.has(l.source));
   const downstreamData = downstreamLinks.map(l => {
     const targetNode = graph.nodes.find(n => n.id === l.target);
     return { 
@@ -67,8 +69,9 @@ const AnomalyAnalysisModal: React.FC<Props> = ({ node, graph, onClose, onAddCons
         name: targetNode?.name,
         type: targetNode?.type,
         impactLevel: targetNode?.status === 'normal' ? 'Low' : 'High',
-        priority: 'VIP', // Mock priority
-        pendingOrders: targetNode?.activeOrders?.length || 0
+        priority: 'VIP',
+        pendingOrders: targetNode?.activeOrders?.length || 0,
+        sourceNodeName: nodes.find(n => n.id === l.source)?.name // Origin of issue
     };
   });
 
@@ -76,45 +79,50 @@ const AnomalyAnalysisModal: React.FC<Props> = ({ node, graph, onClose, onAddCons
     setIsGenerating(true);
     // Simulate AI Generation Delay
     setTimeout(() => {
+        // Dynamic generation based on node count to simulate "Joint" logic
+        const planDescriptionPrefix = nodes.length > 1 
+            ? `针对 ${nodes.length} 个异常节点 (${nodes.map(n => n.name).join(', ')}) 的联合` 
+            : `针对 ${nodes[0].name} 的`;
+
         const plans: EmergencyPlan[] = [
             {
-                id: 'PLAN-A',
-                name: '方案A: 跨基地紧急调货 (激进保交付)',
+                id: 'JOINT-A',
+                name: '方案A: 全局资源紧急调配 (激进保交付)',
                 type: 'aggressive',
-                description: '启用 "宜宾基地" 备用库存，通过空运直发客户产线。虽成本极高，但可确保战略客户零延期。',
-                metrics: { cost: 120, time: 2, satisfaction: 98, risk: 'Low' },
+                description: `${planDescriptionPrefix} 应对策略：启用全网备用库存，通过空运直发受影响客户。优先保障VIP订单，暂停低优先级排产以腾出物流通道。`,
+                metrics: { cost: 180, time: 2, satisfaction: 96, risk: 'Low' },
                 details: {
-                    retrofitCost: '0 (无改造)',
-                    logisticsTime: '12h (宜宾->客户/空运)',
+                    retrofitCost: '12万 (治具快速切换)',
+                    logisticsTime: '12h (空运直达)',
                     rampUpPeriod: 'N/A',
                     batchDelivery: false,
                     referencedRules: ['规则C2: 战略客户优先分配', '规则L1: 跨基地协同允许']
                 }
             },
             {
-                id: 'PLAN-B',
-                name: '方案B: 本地产线技改转产 (平衡型)',
+                id: 'JOINT-B',
+                name: '方案B: 基地间协同转产 (平衡型)',
                 type: 'balanced',
-                description: '对本地 "LFP-Line-2" 进行快速技改以兼容当前型号。需停机3天，后续通过分批交付缓解压力。',
-                metrics: { cost: 45, time: 5, satisfaction: 85, risk: 'Medium' },
+                description: `协调临近基地分担产能。${nodes[0].name} 负责核心模组，其他基地分流 Pack 组装。需协调物流中转。`,
+                metrics: { cost: 65, time: 4, satisfaction: 88, risk: 'Medium' },
                 details: {
-                    retrofitCost: '35万 (模组线治具切换)',
-                    logisticsTime: '4h (本地园区短驳)',
-                    rampUpPeriod: '3天 (50% -> 80% -> 100%)',
+                    retrofitCost: '45万 (协同产线改造)',
+                    logisticsTime: '24h (基地间短驳)',
+                    rampUpPeriod: '2天',
                     batchDelivery: true,
                     referencedRules: ['规则P4: 产线专线专用例外条款', '规则C5: 最小批量限制']
                 }
             },
             {
-                id: 'PLAN-C',
-                name: '方案C: 供应链顺延排产 (保守降本)',
+                id: 'JOINT-C',
+                name: '方案C: 订单顺延与客户协商 (保守降本)',
                 type: 'conservative',
-                description: '等待上游原料到位，维持原生产计划。与客户协商延期交付，赔付违约金，避免额外投入。',
-                metrics: { cost: 15, time: 12, satisfaction: 60, risk: 'High' },
+                description: '暂停异常节点排产，等待上游/设备恢复。统一向客户发送延期通知函，依据合同条款支付违约金。',
+                metrics: { cost: 25, time: 10, satisfaction: 65, risk: 'High' },
                 details: {
                     retrofitCost: '0',
-                    logisticsTime: '3天 (标准陆运)',
-                    rampUpPeriod: 'N/A (维持现状)',
+                    logisticsTime: '常规陆运',
+                    rampUpPeriod: 'N/A',
                     batchDelivery: false,
                     referencedRules: ['规则C1: 订单锁定不做调整', '规则F2: 成本控制优先']
                 }
@@ -131,7 +139,7 @@ const AnomalyAnalysisModal: React.FC<Props> = ({ node, graph, onClose, onAddCons
       setChatMessages([{
           id: 'init',
           role: 'model',
-          content: `您已选择 **${plan.name}**。\n\n该方案预计成本 ${plan.metrics.cost}万，风险等级 ${plan.metrics.risk}。\n\n如果您认为该方案有优化的空间，或者您希望添加新的业务约束（例如："以后必须优先保证VIP客户"、"成本超过100万需总经理审批"），请直接告诉我，我会自动将规则沉淀到系统的**推演知识库**中。`,
+          content: `您已选择 **${plan.name}**。\n\n该方案针对当前选中的 ${nodes.length} 个异常节点进行联合优化，预计成本 ${plan.metrics.cost}万。\n\n如果您对跨基地的调度逻辑有新的约束要求（例如："禁止跨省调拨原材料"），请告诉我，我会自动学习并更新规则库。`,
           timestamp: new Date()
       }]);
   };
@@ -157,13 +165,13 @@ const AnomalyAnalysisModal: React.FC<Props> = ({ node, graph, onClose, onAddCons
           const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
           
           const systemPrompt = `
-          You are a specialized Supply Chain Decision Assistant embedded in an anomaly resolution workflow.
-          Context: User has selected an emergency plan: "${selectedPlan?.name}".
+          You are a specialized Supply Chain Decision Assistant for Joint Simulation (Multi-Node).
+          Context: User has selected an emergency plan: "${selectedPlan?.name}" for ${nodes.length} anomalies.
+          Nodes involved: ${nodes.map(n => n.name).join(', ')}.
           
           Goal:
           1. Discuss the feasibility of the plan.
-          2. **CRITICAL**: If the user mentions a business rule, constraint, or logic preference (e.g., "Always air freight for VIPs", "Never delay NCM orders"), you MUST use the 'learn_rule' tool to extract and save it.
-          3. If the user just chats, respond normally.
+          2. **CRITICAL**: If the user mentions a business rule, constraint, or logic preference, use 'learn_rule' tool.
           `;
     
           const learnRuleTool = {
@@ -174,7 +182,7 @@ const AnomalyAnalysisModal: React.FC<Props> = ({ node, graph, onClose, onAddCons
                       parameters: {
                           type: Type.OBJECT,
                           properties: {
-                              label: { type: Type.STRING, description: "Short title (e.g., 'VIP Air Freight')." },
+                              label: { type: Type.STRING, description: "Short title." },
                               description: { type: Type.STRING, description: "Full rule description." },
                               impactLevel: { type: Type.STRING, enum: ["low", "medium", "high"] },
                               pseudoLogic: { type: Type.STRING, description: "Pseudo-code logic." }
@@ -248,19 +256,20 @@ const AnomalyAnalysisModal: React.FC<Props> = ({ node, graph, onClose, onAddCons
         {/* Header */}
         <div className="bg-white border-b border-slate-200 p-5 flex justify-between items-center shrink-0">
             <div className="flex items-center gap-4">
-                <div className={`p-3 rounded-lg ${node.status === 'critical' ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-600'}`}>
-                    <AlertTriangle size={24} />
+                <div className="p-3 rounded-lg bg-indigo-100 text-indigo-600">
+                    <Layers size={24} />
                 </div>
                 <div>
                     <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-                        异常溯源与智能决策中心
+                        多节点联合推演中心 (Joint Analysis)
                         {currentView === 'planning' && <span className="text-sm font-normal text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">应急预案生成模式</span>}
                     </h2>
                     <div className="flex items-center gap-3 mt-1 text-sm text-slate-500">
-                        <span className="font-mono bg-slate-100 px-2 py-0.5 rounded text-xs font-bold border border-slate-200">{node.id}</span>
-                        <span className="font-medium text-slate-700">{node.name}</span>
+                        <span className="font-bold bg-slate-100 px-2 py-0.5 rounded text-xs text-slate-700 border border-slate-200">
+                            {nodes.length} 个异常节点
+                        </span>
                         <span>|</span>
-                        <span>关联规则库版本: <span className="text-blue-600 font-bold">v2024.10.26</span></span>
+                        <span>推演模型: <span className="text-blue-600 font-bold">CALB-Macro-Sim-v2</span></span>
                     </div>
                 </div>
             </div>
@@ -274,50 +283,49 @@ const AnomalyAnalysisModal: React.FC<Props> = ({ node, graph, onClose, onAddCons
             
             {/* VIEW 1: Analysis Data Tables */}
             {currentView === 'analysis' && (
-                <div className="space-y-8 animate-in slide-in-from-bottom-4 p-6 overflow-y-auto h-full">
+                <div className="space-y-6 animate-in slide-in-from-bottom-4 p-6 overflow-y-auto h-full">
                     
-                    {/* Top Section: The Anomaly Node */}
-                    <div className="bg-white p-6 rounded-xl border border-red-200 shadow-sm flex gap-6 items-start relative overflow-hidden">
-                         <div className="absolute top-0 right-0 p-4 opacity-5">
-                            <AlertCircle size={120} />
-                         </div>
-                         <div className="flex-1 space-y-4">
-                            <h3 className="text-sm font-bold text-slate-500 uppercase flex items-center gap-2">
-                                <Activity size={16} className="text-red-500"/> 当前异常核心 (Root Cause)
-                            </h3>
-                            <div className="grid grid-cols-4 gap-4">
-                                <div className="p-3 bg-slate-50 rounded border border-slate-200">
-                                    <div className="text-xs text-slate-500">当前库存</div>
-                                    <div className="text-xl font-bold text-red-600">{node.inventoryLevel?.toLocaleString() || '--'} <span className="text-xs text-slate-400 font-normal">Ah</span></div>
+                    {/* Top Section: Nodes Horizontal List */}
+                    <div className="space-y-2">
+                        <h3 className="text-sm font-bold text-slate-500 uppercase flex items-center gap-2">
+                            <Activity size={16} className="text-red-500"/> 异常节点聚合视图 (Aggregated Anomalies)
+                        </h3>
+                        <div className="flex gap-4 overflow-x-auto pb-2">
+                            {nodes.map(node => (
+                                <div key={node.id} className="min-w-[240px] bg-white p-4 rounded-xl border border-red-200 shadow-sm relative">
+                                    <div className="flex justify-between items-start mb-2">
+                                        <div className="font-bold text-slate-700">{node.name}</div>
+                                        <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${node.status === 'critical' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>
+                                            {node.status === 'critical' ? 'CRITICAL' : 'WARNING'}
+                                        </span>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-2 text-xs">
+                                        <div>
+                                            <div className="text-slate-400">库存水平</div>
+                                            <div className="font-mono font-bold">{node.inventoryLevel?.toLocaleString() || '-'}</div>
+                                        </div>
+                                        <div>
+                                            <div className="text-slate-400">缺口</div>
+                                            <div className="font-mono font-bold text-red-500">-{(2000 - (node.inventoryLevel || 0)).toLocaleString()}</div>
+                                        </div>
+                                    </div>
                                 </div>
-                                <div className="p-3 bg-slate-50 rounded border border-slate-200">
-                                    <div className="text-xs text-slate-500">安全水位线</div>
-                                    <div className="text-xl font-bold text-slate-700">2,000 <span className="text-xs text-slate-400 font-normal">Ah</span></div>
-                                </div>
-                                <div className="p-3 bg-slate-50 rounded border border-slate-200">
-                                    <div className="text-xs text-slate-500">缺口预估</div>
-                                    <div className="text-xl font-bold text-red-600">-{(2000 - (node.inventoryLevel || 0)).toLocaleString()}</div>
-                                </div>
-                                <div className="p-3 bg-slate-50 rounded border border-slate-200">
-                                    <div className="text-xs text-slate-500">预计停线时间</div>
-                                    <div className="text-xl font-bold text-slate-700">14 <span className="text-xs text-slate-400 font-normal">Hrs</span></div>
-                                </div>
-                            </div>
-                         </div>
+                            ))}
+                        </div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-8">
                         {/* Left: Upstream Data Table */}
                         <div className="space-y-3">
                             <h3 className="text-sm font-bold text-slate-700 flex items-center gap-2">
-                                <Truck size={16} className="text-blue-500"/> 上游供应状态 (Upstream)
+                                <Truck size={16} className="text-blue-500"/> 聚合上游影响 (Upstream Impact)
                             </h3>
                             <div className="bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm">
                                 <table className="w-full text-left text-sm">
                                     <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200">
                                         <tr>
-                                            <th className="px-4 py-3">节点名称</th>
-                                            <th className="px-4 py-3">类型</th>
+                                            <th className="px-4 py-3">供应商</th>
+                                            <th className="px-4 py-3">影响节点</th>
                                             <th className="px-4 py-3">状态</th>
                                             <th className="px-4 py-3 text-right">预估到达</th>
                                         </tr>
@@ -326,7 +334,7 @@ const AnomalyAnalysisModal: React.FC<Props> = ({ node, graph, onClose, onAddCons
                                         {upstreamData.length > 0 ? upstreamData.map((d, i) => (
                                             <tr key={i} className="hover:bg-slate-50">
                                                 <td className="px-4 py-3 font-medium text-slate-700">{d.name}</td>
-                                                <td className="px-4 py-3 text-xs text-slate-500">{d.linkType}</td>
+                                                <td className="px-4 py-3 text-xs text-slate-500">{d.targetNodeName}</td>
                                                 <td className="px-4 py-3">
                                                     <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${d.status === 'normal' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
                                                         {d.status === 'normal' ? '正常' : '异常'}
@@ -345,26 +353,24 @@ const AnomalyAnalysisModal: React.FC<Props> = ({ node, graph, onClose, onAddCons
                         {/* Right: Downstream Data Table */}
                         <div className="space-y-3">
                              <h3 className="text-sm font-bold text-slate-700 flex items-center gap-2">
-                                <Package size={16} className="text-purple-500"/> 下游交付影响 (Downstream)
+                                <Package size={16} className="text-purple-500"/> 聚合下游交付风险 (Downstream Risk)
                             </h3>
                             <div className="bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm">
                                 <table className="w-full text-left text-sm">
                                     <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200">
                                         <tr>
-                                            <th className="px-4 py-3">客户/基地</th>
-                                            <th className="px-4 py-3">客户等级</th>
-                                            <th className="px-4 py-3">受累订单</th>
-                                            <th className="px-4 py-3 text-right">影响程度</th>
+                                            <th className="px-4 py-3">受累客户</th>
+                                            <th className="px-4 py-3">问题源头</th>
+                                            <th className="px-4 py-3">订单数</th>
+                                            <th className="px-4 py-3 text-right">风险</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
                                         {downstreamData.length > 0 ? downstreamData.map((d, i) => (
                                             <tr key={i} className="hover:bg-slate-50">
                                                 <td className="px-4 py-3 font-medium text-slate-700">{d.name}</td>
-                                                <td className="px-4 py-3">
-                                                    <span className="bg-amber-100 text-amber-800 text-xs px-2 py-0.5 rounded font-bold">{d.priority}</span>
-                                                </td>
-                                                <td className="px-4 py-3 text-slate-600">{d.pendingOrders} 单</td>
+                                                <td className="px-4 py-3 text-xs text-slate-500">{d.sourceNodeName}</td>
+                                                <td className="px-4 py-3 text-slate-600">{d.pendingOrders}</td>
                                                 <td className="px-4 py-3 text-right">
                                                     <span className={`font-bold ${d.impactLevel === 'High' ? 'text-red-600' : 'text-slate-600'}`}>
                                                         {d.impactLevel}
@@ -391,7 +397,7 @@ const AnomalyAnalysisModal: React.FC<Props> = ({ node, graph, onClose, onAddCons
                          <>
                              <div className="flex items-center gap-2 mb-4 shrink-0">
                                 <Calculator size={18} className="text-blue-600"/>
-                                <h3 className="text-lg font-bold text-slate-800">智能决策推演结果 (3 Scenarios)</h3>
+                                <h3 className="text-lg font-bold text-slate-800">联合推演结果 (Joint Simulation Scenarios)</h3>
                              </div>
                              <div className="grid grid-cols-3 gap-6 overflow-y-auto">
                                 {generatedPlans.map((plan) => (
@@ -400,7 +406,7 @@ const AnomalyAnalysisModal: React.FC<Props> = ({ node, graph, onClose, onAddCons
                                         plan.type === 'balanced' ? 'border-blue-200 hover:border-blue-400' : 
                                         'border-slate-200 hover:border-slate-400'
                                     }`}>
-                                        {/* Plan Content (Same as before) */}
+                                        {/* Plan Content */}
                                         <div className={`p-4 border-b ${
                                             plan.type === 'aggressive' ? 'bg-amber-50 border-amber-100' : 
                                             plan.type === 'balanced' ? 'bg-blue-50 border-blue-100' : 
@@ -652,7 +658,7 @@ const AnomalyAnalysisModal: React.FC<Props> = ({ node, graph, onClose, onAddCons
                         ) : (
                             <>
                                 <Calculator size={18} />
-                                生成应急预案 (3种)
+                                生成联合预案 (3种)
                             </>
                         )}
                     </button>

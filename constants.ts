@@ -55,7 +55,7 @@ export const INITIAL_SCENARIOS: ScenarioEvent[] = [
     id: 'evt_supply_delay',
     type: 'SUPPLY_DELAY',
     label: '赣锋锂业 - 原料物流延期',
-    description: '受暴雨影响，原料预计延期7天抵达宁德/宜宾基地，影响排产。',
+    description: '受暴雨影响，原料预计延期7天抵达常州/洛阳基地，影响排产。',
     targetNodeId: 'sup-0', // Maps to 赣锋锂业
     severity: 'high',
     active: false
@@ -63,27 +63,27 @@ export const INITIAL_SCENARIOS: ScenarioEvent[] = [
   {
     id: 'evt_demand_spike',
     type: 'DEMAND_SPIKE',
-    label: '某头部新势力A - 交付提前',
+    label: '小鹏 - 交付提前',
     description: '客户要求W42批次提前3天交付，需插单生产。',
-    targetNodeId: 'cust-0', // Maps to 某头部新势力A
+    targetNodeId: 'cust-0', // Maps to 小鹏
     severity: 'medium',
     active: false
   },
   {
     id: 'evt_forecast_drop',
     type: 'FORECAST_DROP',
-    label: '国际巨头C - 季度预测缩减',
+    label: '马自达 - 季度预测缩减',
     description: 'Q4销售预测下调15%，导致专用产线产能过剩。',
-    targetNodeId: 'cust-2', // Maps to 国际巨头C
+    targetNodeId: 'cust-2', // Maps to 马自达
     severity: 'medium',
     active: false
   },
   {
     id: 'evt_inventory_overflow',
     type: 'INVENTORY_OVERFLOW',
-    label: '福鼎基地 - NCM成品积压',
+    label: '江门基地 - NCM成品积压',
     description: '成品库存超过警戒水位线20%，需优先去库存。',
-    targetNodeId: 'base-8', // Maps to 福鼎基地
+    targetNodeId: 'base-8', // Maps to 江门基地
     severity: 'high',
     active: false
   }
@@ -111,15 +111,38 @@ const generateProductionLines = (baseId: string): ProductionLineData[] => {
     }));
 };
 
-const generateOrders = (custId: string): OrderData[] => {
-    return Array.from({ length: Math.floor(Math.random() * 3) + 2 }, (_, i) => ({
-        id: `ORD-${custId.split('-')[1]}-${100+i}`,
-        product: Math.random() > 0.5 ? '5系高压三元' : '磷酸铁锂-储能',
-        volume: Math.floor(Math.random() * 500) + 100,
+// Generate realistic orders based on a target volume to match forecast logic
+const generateOrders = (custId: string, targetVolume: number): OrderData[] => {
+    const orderCount = Math.floor(Math.random() * 3) + 2; // 2 to 4 orders
+    const orders: OrderData[] = [];
+    let currentTotal = 0;
+
+    for (let i = 0; i < orderCount - 1; i++) {
+        // Distribute 20-50% of target to each order
+        const vol = Math.floor((targetVolume - currentTotal) * (0.2 + Math.random() * 0.3));
+        currentTotal += vol;
+        orders.push({
+            id: `ORD-${custId.split('-')[1]}-${100+i}`,
+            product: Math.random() > 0.5 ? '5系高压三元' : '磷酸铁锂-储能',
+            volume: vol,
+            progress: Math.floor(Math.random() * 90),
+            dueDate: `2024-11-${15 + i*5}`,
+            status: Math.random() > 0.85 ? 'delayed' : 'on-track'
+        });
+    }
+
+    // Add remaining volume to last order to ensure sum ≈ target
+    const remaining = Math.max(100, targetVolume - currentTotal);
+    orders.push({
+        id: `ORD-${custId.split('-')[1]}-${100+orderCount-1}`,
+        product: 'Battery',
+        volume: remaining,
         progress: Math.floor(Math.random() * 90),
-        dueDate: `2024-11-${15 + i*5}`,
-        status: Math.random() > 0.8 ? 'delayed' : 'on-track'
-    }));
+        dueDate: `2024-12-05`,
+        status: Math.random() > 0.9 ? 'delayed' : 'on-track'
+    });
+    
+    return orders;
 };
 
 // Generate Mock Data for the Graph
@@ -142,7 +165,7 @@ const generateMockData = (): GraphData => {
   });
 
   // 2. Bases (10)
-  const baseLocations = ['宁德基地', '宜宾基地', '溧阳基地', '西宁基地', '肇庆基地', '宜春基地', '贵阳基地', '厦门基地', '福鼎基地', '德国图林根'];
+  const baseLocations = ['常州基地', '洛阳基地', '厦门基地', '成都基地', '武汉基地', '合肥基地', '黑龙江基地', '广州基地', '江门基地', '眉山基地'];
   baseLocations.forEach((name, i) => {
     const inventory = Math.floor(Math.random() * 20000) + 5000;
     nodes.push({
@@ -163,18 +186,26 @@ const generateMockData = (): GraphData => {
     });
   });
 
-  // 3. Customers (5)
-  const customers = ['某头部新势力A', '某知名车企B', '国际巨头C', '国内龙头D', '战略合资E'];
+  // 3. Customers (7)
+  const customers = ['小鹏', '广汽', '马自达', '长安', '深蓝', '东风乘用车', '零跑'];
   customers.forEach((name, i) => {
+    // Generate Forecast (Base 5000-10000)
+    const forecast = Math.floor(Math.random() * 5000) + 5000;
+    
+    // Generate Target Order Volume (0.7 to 1.3 of forecast) to keep deviation < 30% typically
+    // BUT allow random distribution so some might exceed forecast (1.0 - 1.3)
+    const ratio = 0.7 + (Math.random() * 0.6); // Range: 0.7x to 1.3x
+    const targetOrderVolume = Math.floor(forecast * ratio);
+
     nodes.push({
       id: `cust-${i}`,
       name,
       type: NodeType.CUSTOMER,
       status: 'normal',
-      demandForecast: Math.floor(Math.random() * 10000) + 5000,
+      demandForecast: forecast,
       deliveryAccuracy: 92 + Math.random() * 8,
       onTimeRate: 90 + Math.random() * 10,
-      activeOrders: generateOrders(`cust-${i}`),
+      activeOrders: generateOrders(`cust-${i}`, targetOrderVolume),
       supplyingBases: [], // Filled during linking
       details: {
         batchDelivery: ['批次A-101', '批次B-202', '批次C-303'],
@@ -211,18 +242,15 @@ const generateMockData = (): GraphData => {
   });
 
   // Bases -> Customers (Explicit Logic)
+  const customerCount = customers.length;
   nodes.filter(n => n.type === NodeType.BASE).forEach((base, i) => {
     // Distribute bases to customers in a round-robin + overlap fashion to ensure connectivity
-    // 10 bases, 5 customers. 
-    // i=0 -> cust 0, 1
-    // i=1 -> cust 1, 2
-    // ...
-    const custIndex1 = i % 5;
-    const custIndex2 = (i + 1) % 5;
+    const custIndex1 = i % customerCount;
+    const custIndex2 = (i + 1) % customerCount;
     
     // Add extra random connection for density for first few bases
     const targets = [custIndex1, custIndex2];
-    if (i < 3) targets.push((i + 3) % 5);
+    if (i < 3) targets.push((i + 3) % customerCount);
 
     targets.forEach(custIndex => {
       const custNode = nodes.find(n => n.id === `cust-${custIndex}`);

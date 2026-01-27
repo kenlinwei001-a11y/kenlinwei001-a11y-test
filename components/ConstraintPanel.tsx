@@ -10,6 +10,7 @@ interface Props {
   onAnalyzeConstraint: (text: string) => Promise<Partial<ConstraintItem>>;
   onAddConstraint: (item: ConstraintItem) => void;
   isSimulating: boolean;
+  initialTab?: 'constraints' | 'scenarios'; // New Prop
 }
 
 const ConstraintPanel: React.FC<Props> = ({ 
@@ -19,10 +20,16 @@ const ConstraintPanel: React.FC<Props> = ({
     onRunSimulation, 
     onAnalyzeConstraint,
     onAddConstraint,
-    isSimulating 
+    isSimulating,
+    initialTab = 'scenarios'
 }) => {
-  const [activeTab, setActiveTab] = useState<'constraints' | 'scenarios'>('scenarios');
+  const [activeTab, setActiveTab] = useState<'constraints' | 'scenarios'>(initialTab);
   
+  // Sync tab when prop changes (e.g. clicking different sidebar icons)
+  useEffect(() => {
+    setActiveTab(initialTab);
+  }, [initialTab]);
+
   // Multi-Scenario State
   const [pendingScenarios, setPendingScenarios] = useState<ScenarioConfig[]>([]);
 
@@ -176,8 +183,8 @@ const ConstraintPanel: React.FC<Props> = ({
   };
 
   return (
-    <div className="flex flex-col h-full bg-white border-r border-slate-200 shadow-sm w-80">
-      <div className="flex border-b border-slate-200">
+    <div className="flex flex-col h-full bg-white w-full">
+      <div className="flex border-b border-slate-200 sticky top-0 bg-white z-10">
         <button 
             className={`flex-1 py-4 text-sm font-bold flex items-center justify-center gap-2 ${activeTab === 'scenarios' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/50' : 'text-slate-500 hover:text-slate-700'}`}
             onClick={() => setActiveTab('scenarios')}
@@ -542,7 +549,7 @@ const ConstraintPanel: React.FC<Props> = ({
         )}
       </div>
 
-      <div className="p-4 border-t border-slate-200 bg-slate-50">
+      <div className="p-4 border-t border-slate-200 bg-slate-50 sticky bottom-0 z-10">
         {activeTab === 'scenarios' ? (
              <button 
                 onClick={handleRunJointSimulation}
