@@ -6,7 +6,8 @@ import {
   Search, ArrowLeft, ArrowRight, Check, Trash2, FileText, FileSpreadsheet, 
   AlertCircle, CheckCircle2, RefreshCw, Zap, Link as LinkIcon, Variable, 
   ChevronRight, Sparkles, Terminal, FileType, GitFork, Layers, Plug, Activity,
-  Palette, Grid, Columns, Monitor, LayoutTemplate, Sun, Moon, Coffee, Droplets, Leaf
+  Palette, Grid, Columns, Monitor, LayoutTemplate, Sun, Moon, Coffee, Droplets, Leaf,
+  Network, Key, TableProperties, Workflow, MousePointerClick, MoreHorizontal
 } from 'lucide-react';
 import { LLMConfig, DataSourceConfig, DataPipelineConfig, ObjectTypeDef, AISkill, ThemeConfig, LayoutMode, GlobalMode } from '../types';
 
@@ -19,23 +20,42 @@ interface Props {
 }
 
 // --- MOCK DATA (本地模拟数据) ---
+// Enhanced Mock Objects for the Editor
 const MOCK_OBJECTS: ObjectTypeDef[] = [
     { 
-        id: 'obj_order', name: '生产订单 (ProductionOrder)', icon: 'FileText', properties: [], 
+        id: 'obj_order', name: '生产订单 (ProductionOrder)', icon: 'FileText', 
+        properties: [
+            { id: 'p1', name: 'order_id', dataType: 'string', description: 'Primary Key' },
+            { id: 'p2', name: 'product_sku', dataType: 'string', description: 'Linked Product' },
+            { id: 'p3', name: 'quantity', dataType: 'number', description: 'Target Volume' },
+            { id: 'p4', name: 'due_date', dataType: 'date', description: 'Delivery Deadline' },
+            { id: 'p5', name: 'status', dataType: 'enum', description: 'Current State' }
+        ], 
         actions: [
             { id: 'act_reschedule', name: '调整排期', description: '修改订单交付日期', parameters: [], type: 'Update' },
             { id: 'act_split', name: '拆分工单', description: '按比例拆分生产批次', parameters: [], type: 'TriggerWorkflow' }
         ] 
     },
     { 
-        id: 'obj_inventory', name: '物料库存 (Inventory)', icon: 'Box', properties: [], 
+        id: 'obj_inventory', name: '物料库存 (Inventory)', icon: 'Box', 
+        properties: [
+            { id: 'i1', name: 'sku_id', dataType: 'string', description: 'Material ID' },
+            { id: 'i2', name: 'warehouse_loc', dataType: 'string', description: 'Location Code' },
+            { id: 'i3', name: 'quantity_on_hand', dataType: 'number', description: 'Current Stock' },
+            { id: 'i4', name: 'safety_stock', dataType: 'number', description: 'Min Threshold' }
+        ], 
         actions: [
             { id: 'act_transfer', name: '库存调拨', description: '跨基地调货', parameters: [], type: 'Update' },
             { id: 'act_po', name: '创建采购单', description: '触发紧急采购流程', parameters: [], type: 'Create' }
         ] 
     },
     { 
-        id: 'obj_line', name: '产线设备 (Equipment)', icon: 'Server', properties: [], 
+        id: 'obj_line', name: '产线设备 (Equipment)', icon: 'Server', 
+        properties: [
+            { id: 'e1', name: 'equipment_id', dataType: 'string', description: 'Asset Tag' },
+            { id: 'e2', name: 'oee_score', dataType: 'number', description: 'Efficiency Metric' },
+            { id: 'e3', name: 'last_maintenance', dataType: 'date', description: 'Last Service' }
+        ], 
         actions: [
             { id: 'act_maint', name: '安排维保', description: '创建维修工单', parameters: [], type: 'TriggerWorkflow' }
         ] 
@@ -55,10 +75,14 @@ const SettingsPanel: React.FC<Props> = ({ currentConfig, themeConfig, onConfigSa
   // Intelligence Sub-View State
   const [intelView, setIntelView] = useState<'menu' | 'skills_list' | 'skills_detail' | 'knowledge' | 'prompt'>('menu');
   
+  // Ontology Sub-View State
+  const [ontologyMode, setOntologyMode] = useState<'overview' | 'designer'>('overview');
+  const [selectedObjectId, setSelectedObjectId] = useState<string | null>('obj_order');
+  
   // Data State
   const [config, setConfig] = useState<LLMConfig>(currentConfig);
   const [skills, setSkills] = useState<AISkill[]>(INITIAL_SKILLS);
-  const [selectedSkill, setSelectedSkill] = useState<AISkill | null>(null);
+  const [ontologyObjects, setOntologyObjects] = useState<ObjectTypeDef[]>(MOCK_OBJECTS);
   const [showSaved, setShowSaved] = useState(false);
 
   useEffect(() => { setConfig(currentConfig); }, [currentConfig]);
@@ -68,11 +92,6 @@ const SettingsPanel: React.FC<Props> = ({ currentConfig, themeConfig, onConfigSa
     onConfigSave(config);
     setShowSaved(true);
     setTimeout(() => setShowSaved(false), 2000);
-  };
-
-  const updateSkill = (updated: AISkill) => {
-      setSkills(prev => prev.map(s => s.id === updated.id ? updated : s));
-      setSelectedSkill(updated);
   };
 
   // --- RENDER HELPERS ---
@@ -119,42 +138,246 @@ const SettingsPanel: React.FC<Props> = ({ currentConfig, themeConfig, onConfigSa
       </div>
   );
 
-  // 2. 业务本体 (Ontology)
-  const renderOntology = () => (
+  // 2. 业务本体 (Ontology) - OVERVIEW MODE
+  const renderOntologyOverview = () => (
       <div className="space-y-6 animate-in fade-in slide-in-from-right-4">
-          <div className="bg-slate-50 border border-slate-200 p-5 rounded-xl text-center space-y-3">
-             <div className="mx-auto w-14 h-14 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600">
+          <div className="bg-slate-50 border border-slate-200 p-6 rounded-xl flex items-start gap-4">
+             <div className="w-14 h-14 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600 shrink-0">
                  <Cuboid size={28}/>
              </div>
-             <div>
-                 <h3 className="text-base font-bold text-slate-800">业务对象建模</h3>
-                 <p className="text-sm text-slate-500 mt-1">定义实体、属性及其关系，构建数字孪生语义层。</p>
+             <div className="flex-1">
+                 <h3 className="text-base font-bold text-slate-800">业务对象语义层 (Semantic Layer)</h3>
+                 <p className="text-sm text-slate-500 mt-1 leading-relaxed">
+                     定义数字孪生体的业务含义、属性结构及关联关系。构建 "Object-Action-Link" 动态本体网络，
+                     使 AI 能够理解并操作实际业务实体。
+                 </p>
              </div>
           </div>
           
           <div>
-              <h4 className="text-sm font-bold text-slate-500 uppercase mb-3 flex items-center gap-2">已定义对象 ({MOCK_OBJECTS.length})</h4>
+              <div className="flex justify-between items-center mb-3">
+                  <h4 className="text-sm font-bold text-slate-500 uppercase flex items-center gap-2">已定义对象 ({MOCK_OBJECTS.length})</h4>
+                  <span className="text-xs text-slate-400">上次同步: 2分钟前</span>
+              </div>
               <div className="grid gap-3">
                   {MOCK_OBJECTS.map(obj => (
-                      <div key={obj.id} className="p-4 bg-white border border-slate-200 rounded-lg flex items-center justify-between hover:shadow-sm">
-                          <div className="flex items-center gap-3">
-                              <Box size={20} className="text-slate-400"/>
-                              <span className="text-base font-bold text-slate-700">{obj.name}</span>
+                      <div key={obj.id} className="p-4 bg-white border border-slate-200 rounded-lg flex items-center justify-between hover:shadow-sm group transition-all">
+                          <div className="flex items-center gap-4">
+                              <div className="p-2 bg-slate-100 text-slate-500 rounded-lg group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors">
+                                {obj.icon === 'FileText' ? <FileText size={20}/> : obj.icon === 'Box' ? <Box size={20}/> : <Server size={20}/>}
+                              </div>
+                              <div>
+                                  <span className="text-base font-bold text-slate-700 block">{obj.name}</span>
+                                  <span className="text-xs text-slate-400 font-mono">{obj.id}</span>
+                              </div>
                           </div>
-                          <span className="text-xs bg-slate-100 text-slate-500 px-3 py-1 rounded-full">
-                              {obj.actions.length} 个动作
-                          </span>
+                          <div className="flex items-center gap-3">
+                              <span className="text-xs bg-slate-50 text-slate-500 px-2 py-1 rounded border border-slate-100">
+                                  {obj.properties.length} 属性
+                              </span>
+                              <span className="text-xs bg-slate-50 text-slate-500 px-2 py-1 rounded border border-slate-100">
+                                  {obj.actions.length} 动作
+                              </span>
+                          </div>
                       </div>
                   ))}
               </div>
           </div>
-          <div className="text-center">
-             <button className="text-sm text-indigo-600 font-bold hover:underline flex items-center justify-center gap-1">
-                 进入本体编辑器 <ArrowRight size={14}/>
+          <div className="pt-4 border-t border-slate-100">
+             <button 
+                onClick={() => setOntologyMode('designer')}
+                className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold flex items-center justify-center gap-2 transition-all shadow-md active:scale-95"
+             >
+                 <Network size={20}/> 进入业务语义编辑器 (Ontology Editor)
              </button>
           </div>
       </div>
   );
+
+  // 2. 业务本体 (Ontology) - DESIGNER MODE
+  const renderOntologyDesigner = () => {
+      const selectedObject = ontologyObjects.find(o => o.id === selectedObjectId);
+
+      return (
+          <div className="flex flex-col h-full -m-6 animate-in zoom-in-95 duration-200">
+              {/* Toolbar */}
+              <div className="h-14 border-b border-slate-200 bg-slate-50 flex items-center justify-between px-4 shrink-0">
+                  <div className="flex items-center gap-3">
+                      <button onClick={() => setOntologyMode('overview')} className="p-2 hover:bg-slate-200 rounded-lg text-slate-500 transition-colors">
+                          <ArrowLeft size={18}/>
+                      </button>
+                      <div className="h-6 w-px bg-slate-300"></div>
+                      <span className="font-bold text-slate-700 flex items-center gap-2">
+                          <Cuboid size={18} className="text-indigo-600"/> 语义本体设计器
+                      </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                      <button className="px-3 py-1.5 text-xs font-bold bg-white border border-slate-300 rounded text-slate-600 hover:bg-slate-50">
+                          生成图谱预览
+                      </button>
+                      <button className="px-3 py-1.5 text-xs font-bold bg-indigo-600 text-white rounded hover:bg-indigo-700 flex items-center gap-1">
+                          <Save size={14}/> 保存变更
+                      </button>
+                  </div>
+              </div>
+
+              {/* Designer Body */}
+              <div className="flex flex-1 overflow-hidden">
+                  
+                  {/* Left Sidebar: Object List */}
+                  <div className="w-64 bg-white border-r border-slate-200 flex flex-col">
+                      <div className="p-3 border-b border-slate-100 flex justify-between items-center">
+                          <span className="text-xs font-bold text-slate-400 uppercase">Object Types</span>
+                          <button className="p-1 hover:bg-slate-100 rounded text-slate-400 hover:text-indigo-600"><Plus size={16}/></button>
+                      </div>
+                      <div className="flex-1 overflow-y-auto p-2 space-y-1">
+                          {ontologyObjects.map(obj => (
+                              <button
+                                  key={obj.id}
+                                  onClick={() => setSelectedObjectId(obj.id)}
+                                  className={`w-full text-left px-3 py-2.5 rounded-lg flex items-center gap-3 text-sm transition-colors ${selectedObjectId === obj.id ? 'bg-indigo-50 text-indigo-700 font-bold' : 'text-slate-600 hover:bg-slate-50'}`}
+                              >
+                                  {obj.icon === 'FileText' ? <FileText size={16}/> : obj.icon === 'Box' ? <Box size={16}/> : <Server size={16}/>}
+                                  <div className="truncate">
+                                      <div className="truncate">{obj.name.split(' ')[0]}</div>
+                                      <div className="text-[10px] font-mono opacity-60 truncate">{obj.id}</div>
+                                  </div>
+                              </button>
+                          ))}
+                      </div>
+                  </div>
+
+                  {/* Main Canvas / Editor */}
+                  <div className="flex-1 bg-slate-50/50 flex flex-col overflow-hidden">
+                      {selectedObject ? (
+                          <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
+                              <div className="max-w-4xl mx-auto space-y-8 pb-10">
+                                  
+                                  {/* Header Info */}
+                                  <div className="flex items-start gap-4">
+                                      <div className="w-16 h-16 bg-white border border-slate-200 rounded-xl flex items-center justify-center text-indigo-600 shadow-sm text-2xl">
+                                          {selectedObject.icon === 'FileText' ? <FileText size={32}/> : selectedObject.icon === 'Box' ? <Box size={32}/> : <Server size={32}/>}
+                                      </div>
+                                      <div className="flex-1">
+                                          <h2 className="text-2xl font-bold text-slate-800">{selectedObject.name}</h2>
+                                          <div className="flex items-center gap-3 mt-2 text-sm text-slate-500">
+                                              <span className="font-mono bg-slate-100 px-2 py-0.5 rounded border border-slate-200">{selectedObject.id}</span>
+                                              <span>•</span>
+                                              <span className="flex items-center gap-1"><Database size={14}/> Mapped to: <span className="font-bold">SAP.VBAK</span></span>
+                                          </div>
+                                      </div>
+                                  </div>
+
+                                  {/* Properties Section */}
+                                  <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+                                      <div className="px-5 py-3 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+                                          <h3 className="font-bold text-slate-700 flex items-center gap-2 text-sm">
+                                              <TableProperties size={16} className="text-blue-500"/> 属性定义 (Properties)
+                                          </h3>
+                                          <button className="text-xs font-bold text-blue-600 hover:underline">+ 添加属性</button>
+                                      </div>
+                                      <table className="w-full text-left text-sm">
+                                          <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200">
+                                              <tr>
+                                                  <th className="px-5 py-2 w-10"></th>
+                                                  <th className="px-5 py-2">ID / API Name</th>
+                                                  <th className="px-5 py-2">Type</th>
+                                                  <th className="px-5 py-2">Description</th>
+                                                  <th className="px-5 py-2 w-10"></th>
+                                              </tr>
+                                          </thead>
+                                          <tbody className="divide-y divide-slate-100">
+                                              {selectedObject.properties.map((prop, i) => (
+                                                  <tr key={prop.id} className="hover:bg-slate-50 group">
+                                                      <td className="px-5 py-3 text-center">
+                                                          {i === 0 && <Key size={14} className="text-amber-500 mx-auto" />}
+                                                      </td>
+                                                      <td className="px-5 py-3 font-mono text-slate-700 font-medium">{prop.name}</td>
+                                                      <td className="px-5 py-3">
+                                                          <span className={`px-2 py-0.5 rounded text-xs font-bold border ${
+                                                              prop.dataType === 'string' ? 'bg-blue-50 text-blue-700 border-blue-100' :
+                                                              prop.dataType === 'number' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' :
+                                                              prop.dataType === 'date' ? 'bg-amber-50 text-amber-700 border-amber-100' :
+                                                              'bg-purple-50 text-purple-700 border-purple-100'
+                                                          }`}>
+                                                              {prop.dataType}
+                                                          </span>
+                                                      </td>
+                                                      <td className="px-5 py-3 text-slate-500">{prop.description}</td>
+                                                      <td className="px-5 py-3 text-right">
+                                                          <button className="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 size={14}/></button>
+                                                      </td>
+                                                  </tr>
+                                              ))}
+                                          </tbody>
+                                      </table>
+                                  </div>
+
+                                  {/* Relationships (Visual Mock) */}
+                                  <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+                                      <div className="px-5 py-3 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+                                          <h3 className="font-bold text-slate-700 flex items-center gap-2 text-sm">
+                                              <Network size={16} className="text-purple-500"/> 关联关系 (Links)
+                                          </h3>
+                                          <button className="text-xs font-bold text-purple-600 hover:underline">+ 新增关联</button>
+                                      </div>
+                                      <div className="p-5 flex gap-4 overflow-x-auto">
+                                          {/* Mock Links */}
+                                          <div className="flex items-center gap-2 px-4 py-3 bg-slate-50 border border-slate-200 rounded-lg min-w-[200px]">
+                                              <div className="p-1.5 bg-white border border-slate-200 rounded shadow-sm text-slate-500"><Box size={16}/></div>
+                                              <div className="flex-1 text-center border-b-2 border-dashed border-slate-300 text-[10px] text-slate-400 font-mono relative top-[-1px]">
+                                                  Many-to-One
+                                              </div>
+                                              <div className="p-1.5 bg-indigo-100 border border-indigo-200 rounded shadow-sm text-indigo-600"><FileText size={16}/></div>
+                                          </div>
+                                          <div className="flex items-center justify-center min-w-[200px] border-2 border-dashed border-slate-200 rounded-lg text-slate-400 text-xs font-bold cursor-pointer hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-500 transition-all">
+                                              Create New Link
+                                          </div>
+                                      </div>
+                                  </div>
+
+                                  {/* Actions Section */}
+                                  <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+                                      <div className="px-5 py-3 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+                                          <h3 className="font-bold text-slate-700 flex items-center gap-2 text-sm">
+                                              <MousePointerClick size={16} className="text-rose-500"/> 绑定动作 (Actions)
+                                          </h3>
+                                          <button className="text-xs font-bold text-rose-600 hover:underline">+ 注册动作</button>
+                                      </div>
+                                      <div className="divide-y divide-slate-100">
+                                          {selectedObject.actions.map(action => (
+                                              <div key={action.id} className="px-5 py-3 flex items-center justify-between hover:bg-slate-50 group">
+                                                  <div className="flex items-center gap-3">
+                                                      <div className={`p-1.5 rounded ${action.type === 'Update' ? 'bg-blue-100 text-blue-700' : 'bg-rose-100 text-rose-700'}`}>
+                                                          <Workflow size={16}/>
+                                                      </div>
+                                                      <div>
+                                                          <div className="text-sm font-bold text-slate-700">{action.name}</div>
+                                                          <div className="text-xs text-slate-400">{action.description}</div>
+                                                      </div>
+                                                  </div>
+                                                  <div className="flex items-center gap-4">
+                                                      <span className="text-[10px] font-mono text-slate-400 bg-slate-100 px-2 py-1 rounded">{action.id}</span>
+                                                      <button className="text-slate-400 hover:text-slate-600"><MoreHorizontal size={16}/></button>
+                                                  </div>
+                                              </div>
+                                          ))}
+                                      </div>
+                                  </div>
+
+                              </div>
+                          </div>
+                      ) : (
+                          <div className="flex-1 flex flex-col items-center justify-center text-slate-400">
+                              <Cuboid size={48} className="mb-4 opacity-20"/>
+                              <p className="text-sm">请从左侧选择一个对象类型进行编辑</p>
+                          </div>
+                      )}
+                  </div>
+              </div>
+          </div>
+      );
+  };
 
   // 3. 智能体编排 (Intelligence) - Sub-views
   const renderIntelligence = () => {
@@ -207,7 +430,7 @@ const SettingsPanel: React.FC<Props> = ({ currentConfig, themeConfig, onConfigSa
             <div>
                 <label className="block text-sm font-bold text-slate-500 mb-2">服务提供商 (Provider)</label>
                 <div className="grid grid-cols-2 gap-3 mb-2">
-                    <button onClick={() => setConfig({ ...config, provider: 'gemini', modelName: 'gemini-2.5-flash' })} className={`py-4 text-sm font-bold rounded-lg border transition-all flex items-center justify-center gap-2 ${config.provider === 'gemini' ? 'bg-blue-600 text-white border-blue-600 shadow-md ring-2 ring-blue-100' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}>
+                    <button onClick={() => setConfig({ ...config, provider: 'gemini', modelName: 'gemini-3-flash-preview' })} className={`py-4 text-sm font-bold rounded-lg border transition-all flex items-center justify-center gap-2 ${config.provider === 'gemini' ? 'bg-blue-600 text-white border-blue-600 shadow-md ring-2 ring-blue-100' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}>
                         <Sparkles size={18}/> Google Gemini
                     </button>
                     <button onClick={() => setConfig({ ...config, provider: 'glm', modelName: 'glm-4-plus' })} className={`py-4 text-sm font-bold rounded-lg border transition-all ${config.provider === 'glm' ? 'bg-indigo-600 text-white border-indigo-600 shadow-md' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}>
@@ -226,20 +449,8 @@ const SettingsPanel: React.FC<Props> = ({ currentConfig, themeConfig, onConfigSa
             
             <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-4">
                 <div>
-                    <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase">API Key (令牌)</label>
-                    <div className="relative">
-                        <input type="password" value={config.apiKey} onChange={(e) => setConfig({ ...config, apiKey: e.target.value })} className="w-full bg-white border border-slate-300 rounded-lg p-3 text-sm pl-10 focus:ring-2 focus:ring-blue-500 outline-none font-mono" placeholder="sk-..." />
-                        <Lock size={16} className="absolute left-3 top-3.5 text-slate-400"/>
-                    </div>
-                    {config.provider === 'gemini' && (
-                        <p className="text-[10px] text-slate-400 mt-1.5 flex items-center gap-1">
-                            <InfoIcon /> 您的 Key 将仅存储在本地浏览器中，用于直连 Google API。
-                        </p>
-                    )}
-                </div>
-                <div>
                     <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase">Model Name (模型ID)</label>
-                    <input type="text" value={config.modelName} onChange={(e) => setConfig({ ...config, modelName: e.target.value })} className="w-full bg-white border border-slate-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none font-mono" placeholder="e.g. gemini-2.5-flash" />
+                    <input type="text" value={config.modelName} onChange={(e) => setConfig({ ...config, modelName: e.target.value })} className="w-full bg-white border border-slate-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none font-mono" placeholder="e.g. gemini-3-flash-preview" />
                 </div>
             </div>
          </div>
@@ -365,10 +576,6 @@ const SettingsPanel: React.FC<Props> = ({ currentConfig, themeConfig, onConfigSa
       );
   };
 
-  const InfoIcon = () => (
-      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
-  );
-
   return (
     <div className="flex flex-col h-full bg-white w-full">
       {/* Settings Header */}
@@ -392,7 +599,10 @@ const SettingsPanel: React.FC<Props> = ({ currentConfig, themeConfig, onConfigSa
         ].map((tab) => (
             <button 
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
+                onClick={() => {
+                    setActiveTab(tab.id as any);
+                    // Reset ontology view when switching to it, or keep state? Keeping state is better UX usually.
+                }}
                 className={`flex-1 min-w-[80px] py-4 text-sm font-bold flex flex-col items-center justify-center gap-2 border-b-2 transition-colors ${activeTab === tab.id ? 'border-indigo-600 text-indigo-600 bg-indigo-50/30' : 'border-transparent text-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}
             >
                 <tab.icon size={18}/>
@@ -405,7 +615,12 @@ const SettingsPanel: React.FC<Props> = ({ currentConfig, themeConfig, onConfigSa
       <div className="flex-1 overflow-hidden relative">
           <div className="absolute inset-0 overflow-y-auto p-6 custom-scrollbar">
             {activeTab === 'connectors' && renderConnectors()}
-            {activeTab === 'ontology' && renderOntology()}
+            
+            {/* Ontology Tab Switching logic */}
+            {activeTab === 'ontology' && (
+                ontologyMode === 'overview' ? renderOntologyOverview() : renderOntologyDesigner()
+            )}
+
             {activeTab === 'intelligence' && renderIntelligence()}
             {activeTab === 'model' && renderModelEngine()}
             {activeTab === 'layout' && renderLayoutConfig()}
