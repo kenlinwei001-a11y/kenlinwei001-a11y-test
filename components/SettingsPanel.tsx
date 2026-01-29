@@ -449,6 +449,22 @@ const SettingsPanel: React.FC<Props> = ({ currentConfig, themeConfig, onConfigSa
             
             <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-4">
                 <div>
+                    <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase">API Key (令牌)</label>
+                    <div className="relative">
+                        <input 
+                            type="password" 
+                            value={config.apiKey} 
+                            onChange={(e) => setConfig({ ...config, apiKey: e.target.value })} 
+                            className="w-full bg-white border border-slate-300 rounded-lg p-3 text-sm pl-10 focus:ring-2 focus:ring-blue-500 outline-none font-mono" 
+                            placeholder={process.env.API_KEY ? "已通过环境变量配置 (可覆盖)" : "sk-..."} 
+                        />
+                        <Lock size={16} className="absolute left-3 top-3.5 text-slate-400"/>
+                    </div>
+                    <p className="text-[10px] text-slate-400 mt-1.5 flex items-center gap-1">
+                        <InfoIcon /> 您的 Key 将仅存储在本地浏览器中，用于直连大模型 API。
+                    </p>
+                </div>
+                <div>
                     <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase">Model Name (模型ID)</label>
                     <input type="text" value={config.modelName} onChange={(e) => setConfig({ ...config, modelName: e.target.value })} className="w-full bg-white border border-slate-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none font-mono" placeholder="e.g. gemini-3-flash-preview" />
                 </div>
@@ -575,6 +591,10 @@ const SettingsPanel: React.FC<Props> = ({ currentConfig, themeConfig, onConfigSa
           </div>
       );
   };
+
+  const InfoIcon = () => (
+      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+  );
 
   return (
     <div className="flex flex-col h-full bg-white w-full">

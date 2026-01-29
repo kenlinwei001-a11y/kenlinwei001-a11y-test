@@ -216,7 +216,8 @@ function App() {
       // 1. GEMINI IMPLEMENTATION (REAL CONNECTIVITY)
       if (llmConfig.provider === 'gemini') {
           try {
-              const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+              const apiKey = llmConfig.apiKey || process.env.API_KEY;
+              const ai = new GoogleGenAI({ apiKey: apiKey });
               const modelId = llmConfig.modelName || 'gemini-3-flash-preview';
               
               // Map tools to Gemini format if provided
@@ -362,11 +363,16 @@ function App() {
     setIsAiThinking(true);
 
     try {
+      const activeRules = constraints.flatMap(c => c.items).filter(i => i.enabled).map(i => `- ${i.label}: ${i.description}`).join('\n');
+      
       const systemPrompt = `你是一个供应链数字孪生系统的专家助手。你的目标是协助用户分析供应链风险、优化排产计划和管理库存。
       
       当前系统状态摘要：
       - 节点数量: ${graphData.nodes.length} (涵盖供应商、基地、客户)
       - 活跃异常: ${graphData.nodes.filter(n=>n.status==='critical').length} 个
+      
+      当前生效的业务规则 (Constraints):
+      ${activeRules}
       
       请根据用户的输入提供专业的分析建议。如果用户提到具体的规则设定（例如"如果...则..."），请调用 learn_rule 工具来保存规则。`;
       
