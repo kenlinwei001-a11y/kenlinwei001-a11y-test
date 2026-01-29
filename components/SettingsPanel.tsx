@@ -6,9 +6,9 @@ import {
   Search, ArrowLeft, ArrowRight, Check, Trash2, FileText, FileSpreadsheet, 
   AlertCircle, CheckCircle2, RefreshCw, Zap, Link as LinkIcon, Variable, 
   ChevronRight, Sparkles, Terminal, FileType, GitFork, Layers, Plug, Activity,
-  Palette, Grid, Columns, Monitor, LayoutTemplate
+  Palette, Grid, Columns, Monitor, LayoutTemplate, Sun, Moon, Coffee, Droplets, Leaf
 } from 'lucide-react';
-import { LLMConfig, DataSourceConfig, DataPipelineConfig, ObjectTypeDef, AISkill, ThemeConfig, LayoutMode } from '../types';
+import { LLMConfig, DataSourceConfig, DataPipelineConfig, ObjectTypeDef, AISkill, ThemeConfig, LayoutMode, GlobalMode } from '../types';
 
 interface Props {
   currentConfig: LLMConfig;
@@ -50,7 +50,7 @@ const INITIAL_SKILLS: AISkill[] = [
 
 const SettingsPanel: React.FC<Props> = ({ currentConfig, themeConfig, onConfigSave, onThemeChange, onDataImport }) => {
   // Navigation State
-  const [activeTab, setActiveTab] = useState<'connectors' | 'ontology' | 'intelligence' | 'model' | 'layout' | 'manual'>('ontology');
+  const [activeTab, setActiveTab] = useState<'connectors' | 'ontology' | 'intelligence' | 'model' | 'layout' | 'manual'>('model');
   
   // Intelligence Sub-View State
   const [intelView, setIntelView] = useState<'menu' | 'skills_list' | 'skills_detail' | 'knowledge' | 'prompt'>('menu');
@@ -199,30 +199,54 @@ const SettingsPanel: React.FC<Props> = ({ currentConfig, themeConfig, onConfigSa
                  <Cpu size={28}/>
              </div>
              <h3 className="text-base font-bold text-slate-800">LLM 模型引擎配置</h3>
+             <p className="text-sm text-slate-500 mt-2">
+                 配置大模型 API 连接。支持 <strong className="text-blue-600">Function Calling</strong> 自动执行与规则学习。
+             </p>
          </div>
          <div className="space-y-5">
             <div>
                 <label className="block text-sm font-bold text-slate-500 mb-2">服务提供商 (Provider)</label>
-                <div className="grid grid-cols-3 gap-3">
-                    {(['glm', 'kimi', 'rendu'] as const).map(p => (
-                        <button key={p} onClick={() => setConfig({ ...config, provider: p })} className={`py-3 text-sm font-bold rounded-lg border transition-all ${config.provider === p ? 'bg-indigo-600 text-white border-indigo-600 shadow-md' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}>
-                            {p === 'glm' ? '智谱 GLM4.7' : p === 'kimi' ? 'Kimi' : '传神 Rendu'}
-                        </button>
-                    ))}
+                <div className="grid grid-cols-2 gap-3 mb-2">
+                    <button onClick={() => setConfig({ ...config, provider: 'gemini', modelName: 'gemini-2.5-flash' })} className={`py-4 text-sm font-bold rounded-lg border transition-all flex items-center justify-center gap-2 ${config.provider === 'gemini' ? 'bg-blue-600 text-white border-blue-600 shadow-md ring-2 ring-blue-100' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}>
+                        <Sparkles size={18}/> Google Gemini
+                    </button>
+                    <button onClick={() => setConfig({ ...config, provider: 'glm', modelName: 'glm-4-plus' })} className={`py-4 text-sm font-bold rounded-lg border transition-all ${config.provider === 'glm' ? 'bg-indigo-600 text-white border-indigo-600 shadow-md' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}>
+                        智谱 GLM-4
+                    </button>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                    <button onClick={() => setConfig({ ...config, provider: 'kimi', modelName: 'moonshot-v1-8k' })} className={`py-3 text-sm font-bold rounded-lg border transition-all ${config.provider === 'kimi' ? 'bg-purple-600 text-white border-purple-600 shadow-md' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}>
+                        Moonshot Kimi
+                    </button>
+                    <button onClick={() => setConfig({ ...config, provider: 'rendu', modelName: 'rendu-pro' })} className={`py-3 text-sm font-bold rounded-lg border transition-all ${config.provider === 'rendu' ? 'bg-slate-800 text-white border-slate-800 shadow-md' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}>
+                        传神 Rendu
+                    </button>
                 </div>
             </div>
-            <div>
-                <label className="block text-sm font-bold text-slate-500 mb-2">API 密钥 (Key)</label>
-                <div className="relative">
-                    <input type="password" value={config.apiKey} onChange={(e) => setConfig({ ...config, apiKey: e.target.value })} className="w-full bg-white border border-slate-300 rounded-lg p-3 text-sm pl-10 focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="sk-..." />
-                    <Lock size={16} className="absolute left-3 top-3.5 text-slate-400"/>
+            
+            <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-4">
+                <div>
+                    <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase">API Key (令牌)</label>
+                    <div className="relative">
+                        <input type="password" value={config.apiKey} onChange={(e) => setConfig({ ...config, apiKey: e.target.value })} className="w-full bg-white border border-slate-300 rounded-lg p-3 text-sm pl-10 focus:ring-2 focus:ring-blue-500 outline-none font-mono" placeholder="sk-..." />
+                        <Lock size={16} className="absolute left-3 top-3.5 text-slate-400"/>
+                    </div>
+                    {config.provider === 'gemini' && (
+                        <p className="text-[10px] text-slate-400 mt-1.5 flex items-center gap-1">
+                            <InfoIcon /> 您的 Key 将仅存储在本地浏览器中，用于直连 Google API。
+                        </p>
+                    )}
+                </div>
+                <div>
+                    <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase">Model Name (模型ID)</label>
+                    <input type="text" value={config.modelName} onChange={(e) => setConfig({ ...config, modelName: e.target.value })} className="w-full bg-white border border-slate-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none font-mono" placeholder="e.g. gemini-2.5-flash" />
                 </div>
             </div>
          </div>
      </div>
   );
 
-  // 5. Layout Configuration (Updated with more solid colors)
+  // 5. Layout Configuration (Updated with Global Theme Selector)
   const renderLayoutConfig = () => {
       if (!themeConfig || !onThemeChange) return null;
 
@@ -231,9 +255,7 @@ const SettingsPanel: React.FC<Props> = ({ currentConfig, themeConfig, onConfigSa
               <label className="block text-sm font-bold text-slate-700 mb-3">{label}</label>
               <div className="flex flex-wrap gap-2.5">
                   {options.map((opt) => {
-                      // Logic to determine checkmark color: dark check for light bg, white check for dark bg
                       const isLight = opt.class.includes('-50') || opt.class.includes('white') || opt.class.includes('100') || opt.class.includes('200');
-                      
                       return (
                         <button
                             key={opt.class}
@@ -251,128 +273,101 @@ const SettingsPanel: React.FC<Props> = ({ currentConfig, themeConfig, onConfigSa
           </div>
       );
 
-      const LayoutSelector = () => (
-          <div className="bg-white border border-slate-200 rounded-xl p-5 mb-4">
-              <label className="block text-sm font-bold text-slate-700 mb-3">仪表盘布局模式 (Layout Mode)</label>
-              <div className="grid grid-cols-3 gap-4">
-                  {[
-                      { id: 'bento', label: '标准 Bento', desc: '经典 12 格网格布局', icon: Grid },
-                      { id: 'cinematic', label: '影院宽屏', desc: '全景拓扑图置顶', icon: Monitor },
-                      { id: 'balanced', label: '左右均衡', desc: '左右对比分析', icon: Columns }
-                  ].map((mode) => (
-                      <button
-                          key={mode.id}
-                          onClick={() => onThemeChange({...themeConfig, layoutMode: mode.id as LayoutMode})}
-                          className={`flex flex-col items-center p-4 rounded-xl border-2 transition-all text-center relative overflow-hidden group ${
-                              themeConfig.layoutMode === mode.id 
-                              ? 'border-indigo-600 bg-indigo-50/50 text-indigo-700 shadow-sm' 
-                              : 'border-slate-100 hover:border-slate-300 text-slate-500 hover:bg-slate-50'
-                          }`}
-                      >
-                          <div className={`p-2 rounded-lg mb-2 ${themeConfig.layoutMode === mode.id ? 'bg-white shadow-sm' : 'bg-slate-100 group-hover:bg-white'}`}>
-                              <mode.icon size={24}/>
-                          </div>
-                          <span className="font-bold text-sm">{mode.label}</span>
-                          <span className="text-xs opacity-70 mt-1">{mode.desc}</span>
-                      </button>
-                  ))}
-              </div>
-          </div>
-      );
-
-      // --- EXPANDED COLOR PALETTES (Rich Colors for All) ---
-      const allColors = [
-        // Darks / Saturated
-        { class: 'bg-slate-900', name: 'Slate Dark' },
-        { class: 'bg-zinc-800', name: 'Zinc Dark' },
-        { class: 'bg-red-800', name: 'Red Dark' },
-        { class: 'bg-red-600', name: 'Red Vibrant' },
-        { class: 'bg-orange-800', name: 'Orange Dark' },
-        { class: 'bg-orange-600', name: 'Orange Vibrant' },
-        { class: 'bg-amber-700', name: 'Amber Dark' },
-        { class: 'bg-yellow-700', name: 'Gold Dark' },
-        { class: 'bg-green-800', name: 'Green Dark' },
-        { class: 'bg-green-600', name: 'Green Vibrant' },
-        { class: 'bg-emerald-800', name: 'Emerald Dark' },
-        { class: 'bg-emerald-600', name: 'Emerald Vibrant' },
-        { class: 'bg-teal-800', name: 'Teal Dark' },
-        { class: 'bg-cyan-800', name: 'Cyan Dark' },
-        { class: 'bg-blue-800', name: 'Blue Dark' },
-        { class: 'bg-blue-600', name: 'Blue Vibrant' },
-        { class: 'bg-indigo-900', name: 'Indigo Dark' },
-        { class: 'bg-indigo-600', name: 'Indigo Vibrant' },
-        { class: 'bg-violet-800', name: 'Violet Dark' },
-        { class: 'bg-purple-800', name: 'Purple Dark' },
-        { class: 'bg-rose-800', name: 'Rose Dark' },
-        // Lights
-        { class: 'bg-white', name: 'White' },
-        { class: 'bg-slate-100', name: 'Slate Light' },
-        { class: 'bg-red-50', name: 'Red Light' },
-        { class: 'bg-orange-50', name: 'Orange Light' },
-        { class: 'bg-[#FEF3C7]', name: 'Amber Light' },
-        { class: 'bg-green-50', name: 'Green Light' },
-        { class: 'bg-emerald-50', name: 'Emerald Light' },
-        { class: 'bg-[#eff6ff]', name: 'Blue Light' },
-        { class: 'bg-indigo-50', name: 'Indigo Light' },
-        { class: 'bg-purple-50', name: 'Purple Light' },
+      // Global Theme Selector Options
+      const globalThemes = [
+          { id: 'light', label: '极简白', desc: 'Default Light', icon: Sun, color: 'bg-slate-50', text: 'text-slate-800' },
+          { id: 'dark', label: '深邃黑', desc: 'Midnight Dark', icon: Moon, color: 'bg-slate-900', text: 'text-slate-100' },
+          { id: 'warm', label: '护眼暖', desc: 'Soft Paper', icon: Coffee, color: 'bg-[#fdfbf7]', text: 'text-stone-700' },
+          { id: 'cool', label: '海洋蓝', desc: 'Ocean Breeze', icon: Droplets, color: 'bg-blue-50', text: 'text-blue-900' },
+          { id: 'fresh', label: '清新绿', desc: 'Forest Mint', icon: Leaf, color: 'bg-emerald-50', text: 'text-emerald-900' },
       ];
 
       return (
           <div className="space-y-6 animate-in fade-in slide-in-from-right-4">
               <div className="bg-slate-50 border border-slate-200 p-5 rounded-xl flex items-center gap-4">
                   <div className="p-3 bg-white rounded-lg border border-slate-200 text-indigo-600 shadow-sm">
-                      <LayoutTemplate size={24}/>
+                      <Palette size={24}/>
                   </div>
                   <div>
                       <h3 className="text-base font-bold text-slate-800">界面个性化 (UI Customization)</h3>
-                      <p className="text-sm text-slate-500">自定义布局结构与主题色彩，适配不同场景需求。</p>
+                      <p className="text-sm text-slate-500">自定义布局结构与主题色彩。</p>
                   </div>
               </div>
 
-              {/* Layout Selector */}
-              <LayoutSelector />
+              {/* Global Theme Selector (New) */}
+              <div className="bg-white border border-slate-200 rounded-xl p-5">
+                  <label className="block text-sm font-bold text-slate-700 mb-3">全局主题风格 (Global Theme)</label>
+                  <div className="grid grid-cols-5 gap-3">
+                      {globalThemes.map((mode) => (
+                          <button
+                              key={mode.id}
+                              onClick={() => onThemeChange({...themeConfig, globalMode: mode.id as GlobalMode})}
+                              className={`flex flex-col items-center p-3 rounded-xl border-2 transition-all text-center relative overflow-hidden group ${
+                                  themeConfig.globalMode === mode.id 
+                                  ? 'border-indigo-600 shadow-sm' 
+                                  : 'border-slate-100 hover:border-slate-300'
+                              }`}
+                          >
+                              <div className={`w-full h-12 rounded-lg mb-2 flex items-center justify-center ${mode.color} ${mode.text} border border-black/5`}>
+                                  <mode.icon size={20}/>
+                              </div>
+                              <span className={`text-xs font-bold ${themeConfig.globalMode === mode.id ? 'text-indigo-700' : 'text-slate-500'}`}>{mode.label}</span>
+                          </button>
+                      ))}
+                  </div>
+              </div>
 
+              {/* Layout Mode */}
+              <div className="bg-white border border-slate-200 rounded-xl p-5">
+                  <label className="block text-sm font-bold text-slate-700 mb-3">仪表盘布局模式 (Layout Mode)</label>
+                  <div className="grid grid-cols-3 gap-4">
+                      {[
+                          { id: 'bento', label: '标准 Bento', desc: '经典 12 格网格布局', icon: Grid },
+                          { id: 'cinematic', label: '影院宽屏', desc: '全景拓扑图置顶', icon: Monitor },
+                          { id: 'balanced', label: '左右均衡', desc: '左右对比分析', icon: Columns }
+                      ].map((mode) => (
+                          <button
+                              key={mode.id}
+                              onClick={() => onThemeChange({...themeConfig, layoutMode: mode.id as LayoutMode})}
+                              className={`flex flex-col items-center p-4 rounded-xl border-2 transition-all text-center relative overflow-hidden group ${
+                                  themeConfig.layoutMode === mode.id 
+                                  ? 'border-indigo-600 bg-indigo-50/50 text-indigo-700 shadow-sm' 
+                                  : 'border-slate-100 hover:border-slate-300 text-slate-500 hover:bg-slate-50'
+                              }`}
+                          >
+                              <div className={`p-2 rounded-lg mb-2 ${themeConfig.layoutMode === mode.id ? 'bg-white shadow-sm' : 'bg-slate-100 group-hover:bg-white'}`}>
+                                  <mode.icon size={24}/>
+                              </div>
+                              <span className="font-bold text-sm">{mode.label}</span>
+                              <span className="text-xs opacity-70 mt-1">{mode.desc}</span>
+                          </button>
+                      ))}
+                  </div>
+              </div>
+
+              {/* Specific Card Colors */}
               <div className="grid grid-cols-1 gap-6">
+                  {/* Reuse existing color options logic */}
                   <ColorPicker 
                     label="全景拓扑卡片 (Hero Card)" 
                     value={themeConfig.heroColor}
                     onChange={(v) => onThemeChange({...themeConfig, heroColor: v})}
-                    options={allColors}
-                  />
-                  <ColorPicker 
-                    label="运营看板 (Operations)" 
-                    value={themeConfig.operationsColor}
-                    onChange={(v) => onThemeChange({...themeConfig, operationsColor: v})}
-                    options={allColors}
-                  />
-                  <ColorPicker 
-                    label="产线异常监控 (Production)" 
-                    value={themeConfig.productionColor}
-                    onChange={(v) => onThemeChange({...themeConfig, productionColor: v})}
-                    options={allColors}
-                  />
-                  <ColorPicker 
-                    label="库存监控 (Inventory)" 
-                    value={themeConfig.inventoryColor}
-                    onChange={(v) => onThemeChange({...themeConfig, inventoryColor: v})}
-                    options={allColors}
-                  />
-                  <ColorPicker 
-                    label="产销协同 (Sales)" 
-                    value={themeConfig.salesColor}
-                    onChange={(v) => onThemeChange({...themeConfig, salesColor: v})}
-                    options={allColors}
-                  />
-                  <ColorPicker 
-                    label="产能预测 (Capacity)" 
-                    value={themeConfig.capacityColor}
-                    onChange={(v) => onThemeChange({...themeConfig, capacityColor: v})}
-                    options={allColors}
+                    options={[
+                        { class: 'bg-slate-900', name: 'Slate Dark' },
+                        { class: 'bg-emerald-600', name: 'Emerald Vibrant' },
+                        { class: 'bg-blue-600', name: 'Blue Vibrant' },
+                        { class: 'bg-indigo-600', name: 'Indigo Vibrant' },
+                        { class: 'bg-slate-100', name: 'Slate Light' },
+                    ]}
                   />
               </div>
           </div>
       );
   };
+
+  const InfoIcon = () => (
+      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+  );
 
   return (
     <div className="flex flex-col h-full bg-white w-full">
@@ -388,10 +383,10 @@ const SettingsPanel: React.FC<Props> = ({ currentConfig, themeConfig, onConfigSa
       {/* Tabs */}
       <div className="flex border-b border-slate-200 bg-white px-2 overflow-x-auto no-scrollbar shrink-0">
         {[
+            { id: 'model', label: '模型引擎', icon: Cpu },
             { id: 'ontology', label: '业务定义', icon: Cuboid },
             { id: 'connectors', label: '系统集成', icon: Plug },
             { id: 'intelligence', label: '智能中枢', icon: BrainCircuit },
-            { id: 'model', label: '模型引擎', icon: Cpu },
             { id: 'layout', label: '界面布局', icon: Layout },
             { id: 'manual', label: '数据导入', icon: Upload },
         ].map((tab) => (

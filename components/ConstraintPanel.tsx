@@ -79,16 +79,26 @@ const ConstraintPanel: React.FC<Props> = ({
   useEffect(() => {
     if (selectedNode) {
         if (selectedType === 'SUPPLY_DELAY') {
-            setFormParams({ delayDays: 7, supplyVolume: (selectedNode.inventoryLevel || 5000) * 0.5 });
+            setFormParams({ delayDays: 7, supplyVolume: Math.floor((selectedNode.inventoryLevel || 5000) * 0.5) });
         } else if (selectedType === 'DEMAND_CHANGE') {
             setFormParams({ demandChange: -20, deliveryDate: '2024-W44' });
         } else if (selectedType === 'PRODUCTION_ISSUE') {
             setFormParams({ downtimeDays: 3, efficiencyLoss: 50 });
         } else if (selectedType === 'INVENTORY_ISSUE') {
-            setFormParams({ currentLevel: (selectedNode.inventoryLevel || 10000) * 1.5, threshold: 12000 });
+            setFormParams({ currentLevel: Math.floor((selectedNode.inventoryLevel || 10000) * 1.5), threshold: 12000 });
         }
+    } else {
+        setFormParams({});
     }
   }, [selectedNode, selectedType]);
+
+  const handleParamChange = (key: string, value: string) => {
+      // Allow empty string for typing, otherwise convert to number if possible
+      setFormParams((prev: any) => ({
+          ...prev,
+          [key]: value
+      }));
+  };
 
   const handleAddScenario = () => {
     if (!selectedNode) return;
@@ -527,26 +537,26 @@ const ConstraintPanel: React.FC<Props> = ({
                             <div className="bg-slate-50 p-5 rounded-xl border border-slate-200 grid grid-cols-2 gap-5">
                                 {selectedType === 'SUPPLY_DELAY' && (
                                     <>
-                                        <div><label className="text-xs font-bold text-slate-500 block mb-1.5">延期天数 (Days)</label><input type="number" value={formParams.delayDays || 0} onChange={(e) => setFormParams({...formParams, delayDays: e.target.value})} className="w-full border border-slate-200 rounded-lg p-2.5 text-sm outline-none focus:border-indigo-500"/></div>
-                                        <div><label className="text-xs font-bold text-slate-500 block mb-1.5">影响货量 (Tons)</label><input type="number" disabled value={formParams.supplyVolume || 0} className="w-full border border-slate-200 bg-slate-100 rounded-lg p-2.5 text-sm text-slate-500"/></div>
+                                        <div><label className="text-xs font-bold text-slate-500 block mb-1.5">延期天数 (Days)</label><input type="number" value={formParams.delayDays ?? ''} onChange={(e) => handleParamChange('delayDays', e.target.value)} className="w-full border border-slate-200 rounded-lg p-2.5 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all"/></div>
+                                        <div><label className="text-xs font-bold text-slate-500 block mb-1.5">影响货量 (Tons)</label><input type="number" value={formParams.supplyVolume ?? ''} onChange={(e) => handleParamChange('supplyVolume', e.target.value)} className="w-full border border-slate-200 bg-white rounded-lg p-2.5 text-sm outline-none focus:border-indigo-500"/></div>
                                     </>
                                 )}
                                 {selectedType === 'DEMAND_CHANGE' && (
                                     <>
-                                        <div><label className="text-xs font-bold text-slate-500 block mb-1.5">需求波动 (%)</label><input type="number" value={formParams.demandChange || 0} onChange={(e) => setFormParams({...formParams, demandChange: e.target.value})} className="w-full border border-slate-200 rounded-lg p-2.5 text-sm outline-none focus:border-indigo-500"/></div>
-                                        <div><label className="text-xs font-bold text-slate-500 block mb-1.5">生效批次</label><input type="text" value={formParams.deliveryDate || ''} disabled className="w-full border border-slate-200 bg-slate-100 rounded-lg p-2.5 text-sm text-slate-500"/></div>
+                                        <div><label className="text-xs font-bold text-slate-500 block mb-1.5">需求波动 (%)</label><input type="number" value={formParams.demandChange ?? ''} onChange={(e) => handleParamChange('demandChange', e.target.value)} className="w-full border border-slate-200 rounded-lg p-2.5 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all"/></div>
+                                        <div><label className="text-xs font-bold text-slate-500 block mb-1.5">生效批次</label><input type="text" value={formParams.deliveryDate || ''} onChange={(e) => handleParamChange('deliveryDate', e.target.value)} className="w-full border border-slate-200 bg-white rounded-lg p-2.5 text-sm outline-none focus:border-indigo-500"/></div>
                                     </>
                                 )}
                                 {selectedType === 'PRODUCTION_ISSUE' && (
                                     <>
-                                        <div><label className="text-xs font-bold text-slate-500 block mb-1.5">停机天数</label><input type="number" value={formParams.downtimeDays || 0} onChange={(e) => setFormParams({...formParams, downtimeDays: e.target.value})} className="w-full border border-slate-200 rounded-lg p-2.5 text-sm outline-none focus:border-indigo-500"/></div>
-                                        <div><label className="text-xs font-bold text-slate-500 block mb-1.5">效率损失 (%)</label><input type="number" value={formParams.efficiencyLoss || 0} onChange={(e) => setFormParams({...formParams, efficiencyLoss: e.target.value})} className="w-full border border-slate-200 rounded-lg p-2.5 text-sm outline-none focus:border-indigo-500"/></div>
+                                        <div><label className="text-xs font-bold text-slate-500 block mb-1.5">停机天数</label><input type="number" value={formParams.downtimeDays ?? ''} onChange={(e) => handleParamChange('downtimeDays', e.target.value)} className="w-full border border-slate-200 rounded-lg p-2.5 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all"/></div>
+                                        <div><label className="text-xs font-bold text-slate-500 block mb-1.5">效率损失 (%)</label><input type="number" value={formParams.efficiencyLoss ?? ''} onChange={(e) => handleParamChange('efficiencyLoss', e.target.value)} className="w-full border border-slate-200 rounded-lg p-2.5 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all"/></div>
                                     </>
                                 )}
                                 {selectedType === 'INVENTORY_ISSUE' && (
                                      <>
-                                        <div><label className="text-xs font-bold text-slate-500 block mb-1.5">当前模拟库存</label><input type="number" value={formParams.currentLevel || 0} onChange={(e) => setFormParams({...formParams, currentLevel: e.target.value})} className="w-full border border-slate-200 rounded-lg p-2.5 text-sm outline-none focus:border-indigo-500"/></div>
-                                        <div><label className="text-xs font-bold text-slate-500 block mb-1.5">触发阈值</label><input type="number" disabled value={formParams.threshold || 0} className="w-full border border-slate-200 bg-slate-100 rounded-lg p-2.5 text-sm text-slate-500"/></div>
+                                        <div><label className="text-xs font-bold text-slate-500 block mb-1.5">当前模拟库存</label><input type="number" value={formParams.currentLevel ?? ''} onChange={(e) => handleParamChange('currentLevel', e.target.value)} className="w-full border border-slate-200 rounded-lg p-2.5 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all"/></div>
+                                        <div><label className="text-xs font-bold text-slate-500 block mb-1.5">触发阈值</label><input type="number" value={formParams.threshold ?? ''} onChange={(e) => handleParamChange('threshold', e.target.value)} className="w-full border border-slate-200 bg-white rounded-lg p-2.5 text-sm outline-none focus:border-indigo-500"/></div>
                                      </>
                                 )}
                             </div>

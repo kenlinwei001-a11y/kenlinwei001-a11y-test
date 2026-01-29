@@ -132,7 +132,7 @@ export interface ChatMessage {
 }
 
 // --- SETTINGS & INTEGRATION ---
-export type LLMProvider = 'glm' | 'kimi' | 'rendu';
+export type LLMProvider = 'glm' | 'kimi' | 'rendu' | 'gemini';
 
 export interface LLMConfig {
   provider: LLMProvider;
@@ -143,9 +143,11 @@ export interface LLMConfig {
 
 // Theme Configuration
 export type LayoutMode = 'bento' | 'cinematic' | 'balanced';
+export type GlobalMode = 'light' | 'dark' | 'warm' | 'cool' | 'fresh';
 
 export interface ThemeConfig {
   layoutMode: LayoutMode;
+  globalMode: GlobalMode;
   heroColor: string;
   operationsColor: string;
   productionColor: string;
