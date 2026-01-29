@@ -7,7 +7,7 @@ import {
   AlertCircle, CheckCircle2, RefreshCw, Zap, Link as LinkIcon, Variable, 
   ChevronRight, Sparkles, Terminal, FileType, GitFork, Layers, Plug, Activity,
   Palette, Grid, Columns, Monitor, LayoutTemplate, Sun, Moon, Coffee, Droplets, Leaf,
-  Network, Key, TableProperties, Workflow, MousePointerClick, MoreHorizontal
+  Network, Key as KeyIcon, TableProperties, Workflow, MousePointerClick, MoreHorizontal
 } from 'lucide-react';
 import { LLMConfig, DataSourceConfig, DataPipelineConfig, ObjectTypeDef, AISkill, ThemeConfig, LayoutMode, GlobalMode } from '../types';
 
@@ -290,7 +290,7 @@ const SettingsPanel: React.FC<Props> = ({ currentConfig, themeConfig, onConfigSa
                                               {selectedObject.properties.map((prop, i) => (
                                                   <tr key={prop.id} className="hover:bg-slate-50 group">
                                                       <td className="px-5 py-3 text-center">
-                                                          {i === 0 && <Key size={14} className="text-amber-500 mx-auto" />}
+                                                          {i === 0 && <KeyIcon size={14} className="text-amber-500 mx-auto" />}
                                                       </td>
                                                       <td className="px-5 py-3 font-mono text-slate-700 font-medium">{prop.name}</td>
                                                       <td className="px-5 py-3">

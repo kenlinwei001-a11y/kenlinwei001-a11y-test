@@ -527,7 +527,7 @@ function App() {
   const handleNodeClick = useCallback((node: NodeData) => {
     // If not in simulation, selecting nodes might open standard analysis
     setModalMode('analysis');
-    setSelectedNodes(prev => prev.find(n => n.id === node.id) : [...prev, node]);
+    setSelectedNodes(prev => prev.find(n => n.id === node.id) ? prev.filter(n => n.id !== node.id) : [...prev, node]);
   }, []);
 
   const handleBackgroundClick = useCallback(() => { setSelectedNodes([]); }, []);
@@ -844,6 +844,46 @@ function App() {
                             <div className={`text-center text-xs font-bold mt-2 opacity-0 group-hover:opacity-100 transition-opacity ${isDark(theme.capacityColor) ? 'text-white/80' : 'text-blue-600'}`}>点击查看详细工艺分析 &rarr;</div>
                         </div>
                     </div>
+                </div>
+            )}
+
+            {activeView !== 'home' && (
+                <div className="absolute inset-0 w-full h-full bg-slate-50 overflow-hidden">
+                    {activeView === 'graph_full' && (
+                         <>
+                            <div className="absolute top-4 left-4 z-10 pointer-events-none select-none">
+                                <h2 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-1">供应链全景视图</h2>
+                                <div className="flex flex-col gap-2 items-start mt-1">
+                                    <button onClick={handleSelectAllRisks} className="flex items-center gap-1.5 bg-white/80 backdrop-blur-sm border border-slate-200 px-4 py-2 rounded-full shadow-sm text-xs font-bold text-red-600 hover:bg-white transition-colors cursor-pointer pointer-events-auto"><AlertTriangle size={14}/> 一键选中所有风险节点 (批量推演)</button>
+                                </div>
+                            </div>
+                            <SupplyChainGraph data={graphData} onNodeHover={onNodeHover} onNodeClick={handleNodeClick} onBackgroundClick={handleBackgroundClick} selectedNodeIds={selectedNodes.map(n => n.id)} width={dimensions.width} height={dimensions.height}/>
+                            <Tooltip node={hoveredNode.node} position={hoveredNode.node ? { x: hoveredNode.x, y: hoveredNode.y } : null} onDrillDown={handleNodeClick} onMouseEnter={onTooltipEnter} onMouseLeave={onTooltipLeave}/>
+                            {selectedNodes.length > 0 && (
+                                <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 z-20 animate-in slide-in-from-bottom-4 fade-in duration-300">
+                                    <div className="bg-slate-900/90 backdrop-blur-md text-white px-8 py-4 rounded-full shadow-2xl flex items-center gap-8 border border-slate-700/50">
+                                        <div className="flex items-center gap-4"><div className="bg-blue-600 rounded-full w-10 h-10 flex items-center justify-center font-bold text-base shadow-inner">{selectedNodes.length}</div><div className="flex flex-col"><span className="text-base font-bold">已选异常节点</span><span className="text-xs text-slate-400">点击图谱可继续添加</span></div></div>
+                                        <div className="h-10 w-px bg-slate-700"></div>
+                                        <div className="flex gap-3">
+                                            <button onClick={() => setSelectedNodes([])} className="px-4 py-2.5 text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-800 rounded-lg transition-colors flex items-center gap-1"><RotateCcw size={16} /> 清空</button>
+                                            <button onClick={() => { setModalMode('analysis'); setIsAnalysisModalOpen(true); }} className="px-6 py-2.5 text-base font-bold bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 rounded-full shadow-lg transition-all transform hover:scale-105 flex items-center gap-2"><Play size={18} fill="currentColor" /> 执行联合推演</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                         </>
+                    )}
+                    {activeView === 'dashboard' && <DashboardPanel data={graphData} />}
+                    {activeView === 'inventory' && <InventoryPanel />}
+                    {activeView === 'sales' && <SalesPanel />}
+                    {activeView === 'production' && <ProductionMonitorPanel />}
+                    {activeView === 'capacity' && <CapacityPanel />}
+                    {activeView === 'settings' && (<SettingsPanel currentConfig={llmConfig} themeConfig={theme} onConfigSave={handleConfigSave} onThemeChange={handleThemeChange} onDataImport={handleDataImport}/>)}
+                    {(activeView === 'config' || activeView === 'scenario') && (
+                        <div className="h-full bg-white">
+                             <ConstraintPanel constraints={constraints} nodes={graphData.nodes} onToggleConstraint={handleConstraintToggle} onRunSimulation={handleRunSimulation} onAnalyzeConstraint={handleAnalyzeConstraint} onAddConstraint={handleAddConstraint} isSimulating={isAiThinking} initialTab={activeView === 'scenario' ? 'scenarios' : 'constraints'}/>
+                        </div>
+                    )}
                 </div>
             )}
 
