@@ -1,8 +1,9 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { NodeData, GraphData, ConstraintItem, ChatMessage } from '../types';
-import { X, AlertTriangle, ArrowRight, Activity, Truck, Package, AlertCircle, Calculator, CheckCircle2, Clock, DollarSign, BarChart3, FileText, Bot, User, Send, BrainCircuit, ArrowLeft, GitCommit, Layers, FileSpreadsheet, ChevronDown, Download, Share, Workflow, Database, RefreshCw, Filter, Split, PlayCircle, FileCheck, Check, Maximize2, Move } from 'lucide-react';
+import { NodeData, GraphData, ConstraintItem, ChatMessage, AttachmentType, ChatAttachment } from '../types';
+import { X, AlertTriangle, ArrowRight, Activity, Truck, Package, AlertCircle, Calculator, CheckCircle2, Clock, DollarSign, BarChart3, FileText, Bot, User, Send, BrainCircuit, ArrowLeft, GitCommit, Layers, FileSpreadsheet, ChevronDown, Download, Share, Workflow, Database, RefreshCw, Filter, Split, PlayCircle, FileCheck, Check, Maximize2, Minimize2, Move } from 'lucide-react';
 import { GoogleGenAI, Type } from "@google/genai";
+import { MiniInventoryChart, MiniProductionTable, MiniPlanCards } from './ChatWidgets';
 
 interface Props {
   nodes: NodeData[];
@@ -47,6 +48,9 @@ export const AnomalyAnalysisModal: React.FC<Props> = ({ nodes, graph, mode = 'an
   const [chatInput, setChatInput] = useState('');
   const [isChatThinking, setIsChatThinking] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  
+  // Chat Layout State
+  const [isChatMaximized, setIsChatMaximized] = useState(false);
 
   // Floating Window State
   const [showFloatingReport, setShowFloatingReport] = useState(false);
@@ -207,12 +211,65 @@ export const AnomalyAnalysisModal: React.FC<Props> = ({ nodes, graph, mode = 'an
       setChatMessages(prev => [...prev, userMsg]);
       setIsChatThinking(true);
 
-      // AI logic truncated for brevity, assume similar to original implementation
-      // ...
+      // --- Mock AI Attachment Logic ---
+      let mockAttachment: { type: AttachmentType, title: string, data: any } | undefined = undefined;
+      let mockResponse = "收到您的反馈，已记录。";
+
+      if (userText.includes('排产') || userText.includes('详情')) {
+          mockResponse = "这是根据当前方案调整后的排产计划草案，请确认是否符合您的预期：";
+          mockAttachment = {
+              type: 'production_table',
+              title: '调整后排产计划',
+              data: [
+                  { line: 'Line-1', product: '590 Mod', qty: 1500, status: 'Full' },
+                  { line: 'Line-2', product: '4680 Cell', qty: 0, status: 'Stopped' }, // Simulation impact
+                  { line: 'Line-3', product: 'LFP Pack', qty: 1200, status: 'Normal' },
+              ]
+          };
+      } else if (userText.includes('库存') || userText.includes('水位')) {
+          mockResponse = "为您展示当前方案下的库存模拟水位，可以看到在第4天有明显回升：";
+          mockAttachment = {
+              type: 'inventory_chart',
+              title: '库存模拟推演',
+              data: {
+                  history: [
+                      { day: 'T+1', value: 800, safe: 2000 },
+                      { day: 'T+2', value: 600, safe: 2000 },
+                      { day: 'T+3', value: 1500, safe: 2000 },
+                      { day: 'T+4', value: 2200, safe: 2000 },
+                      { day: 'T+5', value: 2500, safe: 2000 },
+                  ],
+                  current: 800,
+                  status: 'warning'
+              }
+          };
+      }
+
+      // -------------------------------
+
       setTimeout(() => {
           setIsChatThinking(false);
-          setChatMessages(prev => [...prev, { id: Date.now().toString(), role: 'model', content: "收到您的反馈，已记录。", timestamp: new Date() }]);
-      }, 1000);
+          setChatMessages(prev => [...prev, { 
+              id: Date.now().toString(), 
+              role: 'model', 
+              content: mockResponse, 
+              timestamp: new Date(),
+              attachment: mockAttachment 
+          }]);
+      }, 1200);
+  };
+
+  const renderAttachment = (attachment: ChatAttachment) => {
+      switch (attachment.type) {
+          case 'inventory_chart':
+              return <MiniInventoryChart data={attachment.data} />;
+          case 'production_table':
+              return <MiniProductionTable data={attachment.data} />;
+          case 'plan_card':
+              return <MiniPlanCards plans={attachment.data} />;
+          default:
+              return null;
+      }
   };
 
   // --- REPORT VIEW COMPONENTS ---
@@ -793,57 +850,59 @@ export const AnomalyAnalysisModal: React.FC<Props> = ({ nodes, graph, mode = 'an
                          // SPLIT VIEW: Selected Plan + Chat
                          <div className="flex h-full gap-8 relative">
                             {/* Left: The Selected Plan Details (Read-only view) */}
-                            <div className="w-1/3 flex flex-col h-full bg-white rounded-xl border-2 border-slate-200 shadow-md overflow-hidden shrink-0">
-                                <div className="p-5 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
-                                    <button onClick={() => setSelectedPlan(null)} className="flex items-center gap-1 text-slate-500 text-sm font-bold hover:text-blue-600">
-                                        <ArrowLeft size={16}/> 返回列表
-                                    </button>
-                                    <span className="text-sm font-bold text-blue-600">当前选中</span>
-                                </div>
-                                <div className="p-6 flex-1 overflow-y-auto">
-                                    <h4 className="text-xl font-bold text-slate-800 mb-3">{selectedPlan.name}</h4>
-                                    <p className="text-base text-slate-600 leading-relaxed mb-6 bg-slate-50 p-4 rounded-lg border border-slate-100">
-                                        {selectedPlan.description}
-                                    </p>
-                                    
-                                    <div className="space-y-6">
-                                         <div>
-                                            <div className="text-xs font-bold text-slate-400 uppercase mb-3">关键指标</div>
-                                            <div className="grid grid-cols-2 gap-4">
-                                                <div className="p-3 bg-slate-50 rounded border border-slate-100">
-                                                    <div className="text-xs text-slate-500">预估成本</div>
-                                                    <div className="text-xl font-bold text-slate-700">{selectedPlan.metrics.cost}万</div>
-                                                </div>
-                                                <div className="p-3 bg-slate-50 rounded border border-slate-100">
-                                                    <div className="text-xs text-slate-500">风险等级</div>
-                                                    <div className={`text-xl font-bold ${selectedPlan.metrics.risk === 'High' ? 'text-red-600' : 'text-emerald-600'}`}>{selectedPlan.metrics.risk}</div>
+                            {!isChatMaximized && (
+                                <div className="w-1/3 flex flex-col h-full bg-white rounded-xl border-2 border-slate-200 shadow-md overflow-hidden shrink-0 animate-in fade-in slide-in-from-left-4">
+                                    <div className="p-5 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+                                        <button onClick={() => setSelectedPlan(null)} className="flex items-center gap-1 text-slate-500 text-sm font-bold hover:text-blue-600">
+                                            <ArrowLeft size={16}/> 返回列表
+                                        </button>
+                                        <span className="text-sm font-bold text-blue-600">当前选中</span>
+                                    </div>
+                                    <div className="p-6 flex-1 overflow-y-auto">
+                                        <h4 className="text-xl font-bold text-slate-800 mb-3">{selectedPlan.name}</h4>
+                                        <p className="text-base text-slate-600 leading-relaxed mb-6 bg-slate-50 p-4 rounded-lg border border-slate-100">
+                                            {selectedPlan.description}
+                                        </p>
+                                        
+                                        <div className="space-y-6">
+                                            <div>
+                                                <div className="text-xs font-bold text-slate-400 uppercase mb-3">关键指标</div>
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    <div className="p-3 bg-slate-50 rounded border border-slate-100">
+                                                        <div className="text-xs text-slate-500">预估成本</div>
+                                                        <div className="text-xl font-bold text-slate-700">{selectedPlan.metrics.cost}万</div>
+                                                    </div>
+                                                    <div className="p-3 bg-slate-50 rounded border border-slate-100">
+                                                        <div className="text-xs text-slate-500">风险等级</div>
+                                                        <div className={`text-xl font-bold ${selectedPlan.metrics.risk === 'High' ? 'text-red-600' : 'text-emerald-600'}`}>{selectedPlan.metrics.risk}</div>
+                                                    </div>
                                                 </div>
                                             </div>
-                                         </div>
-                                         
-                                         <div>
-                                             <div className="text-xs font-bold text-slate-400 uppercase mb-3">执行细节</div>
-                                             <ul className="space-y-3 text-sm text-slate-700">
-                                                <li className="flex justify-between border-b border-slate-50 pb-1"><span>产线改造:</span> <span className="font-medium">{selectedPlan.details.retrofitCost}</span></li>
-                                                <li className="flex justify-between border-b border-slate-50 pb-1"><span>物流时效:</span> <span className="font-medium">{selectedPlan.details.logisticsTime}</span></li>
-                                                <li className="flex justify-between border-b border-slate-50 pb-1"><span>分批交付:</span> <span className="font-medium">{selectedPlan.details.batchDelivery ? '是' : '否'}</span></li>
-                                             </ul>
-                                         </div>
+                                            
+                                            <div>
+                                                <div className="text-xs font-bold text-slate-400 uppercase mb-3">执行细节</div>
+                                                <ul className="space-y-3 text-sm text-slate-700">
+                                                    <li className="flex justify-between border-b border-slate-50 pb-1"><span>产线改造:</span> <span className="font-medium">{selectedPlan.details.retrofitCost}</span></li>
+                                                    <li className="flex justify-between border-b border-slate-50 pb-1"><span>物流时效:</span> <span className="font-medium">{selectedPlan.details.logisticsTime}</span></li>
+                                                    <li className="flex justify-between border-b border-slate-50 pb-1"><span>分批交付:</span> <span className="font-medium">{selectedPlan.details.batchDelivery ? '是' : '否'}</span></li>
+                                                </ul>
+                                            </div>
 
-                                         {/* Floating Report Toggle Button */}
-                                         <button 
-                                            onClick={() => setShowFloatingReport(true)}
-                                            className="w-full py-3 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg font-bold flex items-center justify-center gap-2 shadow-md transition-colors"
-                                         >
-                                             <FileSpreadsheet size={18}/> 查看排产详情 (浮窗)
-                                         </button>
+                                            {/* Floating Report Toggle Button */}
+                                            <button 
+                                                onClick={() => setShowFloatingReport(true)}
+                                                className="w-full py-3 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg font-bold flex items-center justify-center gap-2 shadow-md transition-colors"
+                                            >
+                                                <FileSpreadsheet size={18}/> 查看排产详情 (浮窗)
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
+                            )}
 
                             {/* Right: Negotiation Chat */}
-                            <div className="flex-1 flex flex-col bg-white rounded-xl border border-slate-200 shadow-md overflow-hidden">
-                                <div className="p-5 border-b border-slate-200 bg-gradient-to-r from-blue-50/50 to-white flex justify-between items-center">
+                            <div className={`flex-1 flex flex-col bg-white rounded-xl border border-slate-200 shadow-md overflow-hidden transition-all duration-300 ${isChatMaximized ? 'w-full' : ''}`}>
+                                <div className="p-5 border-b border-slate-200 bg-gradient-to-r from-blue-50/50 to-white flex justify-between items-center shrink-0">
                                     <div className="flex items-center gap-3">
                                         <div className="p-2.5 bg-blue-100 text-blue-600 rounded-lg">
                                             <Bot size={24} />
@@ -853,36 +912,54 @@ export const AnomalyAnalysisModal: React.FC<Props> = ({ nodes, graph, mode = 'an
                                             <p className="text-xs text-slate-500">AI 可自动从对话中提取并保存业务规则</p>
                                         </div>
                                     </div>
-                                    <div className="flex items-center gap-2 px-4 py-1.5 bg-purple-50 text-purple-700 rounded-full border border-purple-100 text-xs font-bold">
-                                        <BrainCircuit size={14}/>
-                                        知识库联动中
+                                    <div className="flex items-center gap-2">
+                                        <div className="flex items-center gap-2 px-4 py-1.5 bg-purple-50 text-purple-700 rounded-full border border-purple-100 text-xs font-bold mr-2">
+                                            <BrainCircuit size={14}/>
+                                            知识库联动中
+                                        </div>
+                                        <button 
+                                            onClick={() => setIsChatMaximized(!isChatMaximized)}
+                                            className="text-slate-400 hover:text-blue-600 p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                                            title={isChatMaximized ? "Restore" : "Maximize"}
+                                        >
+                                            {isChatMaximized ? <Minimize2 size={18}/> : <Maximize2 size={18}/>}
+                                        </button>
                                     </div>
                                 </div>
 
                                 <div className="flex-1 overflow-y-auto p-5 space-y-5 bg-slate-50/30">
                                     {chatMessages.map((msg) => (
-                                        <div key={msg.id} className={`flex gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
+                                        <div key={msg.id} className={`flex gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : ''} ${isChatMaximized ? 'max-w-4xl mx-auto' : ''}`}>
                                             <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${msg.role === 'model' ? 'bg-blue-600 text-white' : 'bg-slate-300 text-slate-600'}`}>
                                                 {msg.role === 'model' ? <Bot size={20} /> : <User size={20} />}
                                             </div>
-                                            <div className={`max-w-[80%] rounded-2xl px-5 py-4 text-base shadow-sm ${
-                                                msg.role === 'model' ? 'bg-white text-slate-700 border border-slate-100' : 'bg-blue-600 text-white'
-                                            }`}>
-                                                {msg.content.includes('已自动识别并沉淀规则') ? (
-                                                     <div>
-                                                         <div className="flex items-center gap-2 mb-2 pb-2 border-b border-purple-100 text-purple-700 font-bold">
-                                                             <GitCommit size={18}/> 规则已沉淀 (Rule Committed)
-                                                         </div>
-                                                         <div className="whitespace-pre-wrap">{msg.content.replace('✨ **已自动识别并沉淀规则**', '').trim()}</div>
-                                                     </div>
-                                                ) : (
-                                                    <div className="whitespace-pre-wrap">{msg.content}</div>
+                                            <div className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'} max-w-[85%]`}>
+                                                <div className={`rounded-2xl px-5 py-4 text-base shadow-sm ${
+                                                    msg.role === 'model' ? 'bg-white text-slate-700 border border-slate-100' : 'bg-blue-600 text-white'
+                                                }`}>
+                                                    {msg.content.includes('已自动识别并沉淀规则') ? (
+                                                        <div>
+                                                            <div className="flex items-center gap-2 mb-2 pb-2 border-b border-purple-100 text-purple-700 font-bold">
+                                                                <GitCommit size={18}/> 规则已沉淀 (Rule Committed)
+                                                            </div>
+                                                            <div className="whitespace-pre-wrap">{msg.content.replace('✨ **已自动识别并沉淀规则**', '').trim()}</div>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="whitespace-pre-wrap">{msg.content}</div>
+                                                    )}
+                                                </div>
+
+                                                {/* Render Attachment in Joint Chat */}
+                                                {msg.attachment && (
+                                                    <div className={`mt-3 w-full animate-in fade-in slide-in-from-top-2 ${isChatMaximized ? 'max-w-2xl' : 'max-w-full'}`}>
+                                                        {renderAttachment(msg.attachment)}
+                                                    </div>
                                                 )}
                                             </div>
                                         </div>
                                     ))}
                                     {isChatThinking && (
-                                        <div className="flex gap-3">
+                                        <div className={`flex gap-3 ${isChatMaximized ? 'max-w-4xl mx-auto' : ''}`}>
                                             <div className="w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center">
                                                 <Bot size={20} />
                                             </div>
@@ -896,12 +973,12 @@ export const AnomalyAnalysisModal: React.FC<Props> = ({ nodes, graph, mode = 'an
                                     <div ref={messagesEndRef} />
                                 </div>
 
-                                <div className="p-5 bg-white border-t border-slate-200">
-                                    <div className="relative">
+                                <div className="p-5 bg-white border-t border-slate-200 shrink-0">
+                                    <div className={`relative ${isChatMaximized ? 'max-w-4xl mx-auto' : ''}`}>
                                         <input
                                             type="text"
                                             className="w-full bg-slate-50 border border-slate-200 text-slate-800 text-base rounded-lg pl-5 pr-14 py-4 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                                            placeholder="输入您的调整意见 (如: '以后必须优先保证VIP客户')..."
+                                            placeholder={isChatMaximized ? "输入您的调整意见，例如：'查看库存影响' 或 '生成新的排产表'..." : "输入调整意见..."}
                                             value={chatInput}
                                             onChange={(e) => setChatInput(e.target.value)}
                                             onKeyDown={(e) => e.key === 'Enter' && handleSendChatMessage()}

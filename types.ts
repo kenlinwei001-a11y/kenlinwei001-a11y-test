@@ -25,6 +25,7 @@ export interface OrderData {
   progress: number; // 0-100
   dueDate: string;
   status: 'on-track' | 'delayed' | 'risk';
+  customerId?: string; // Foreign Key for DB
 }
 
 export interface NodeData {
@@ -61,6 +62,7 @@ export interface NodeData {
 }
 
 export interface LinkData {
+  id?: number; // Auto-increment for DB
   source: string; // ID
   target: string; // ID
   value: number; 
@@ -109,7 +111,7 @@ export interface ScenarioConfig {
   targetNodeName: string;
   type: 'SUPPLY_DELAY' | 'DEMAND_CHANGE' | 'INVENTORY_ISSUE' | 'PRODUCTION_ISSUE';
   parameters: {
-    [key: string]: string | number; // e.g., delayDays: 5, newVolume: 1000
+    [key: string]: string | number; // e.g. delayDays: 5, newVolume: 1000
   };
   description: string;
 }
@@ -124,11 +126,21 @@ export interface ScenarioEvent {
   active: boolean;
 }
 
+// RICH CHAT TYPES
+export type AttachmentType = 'inventory_chart' | 'production_table' | 'plan_card';
+
+export interface ChatAttachment {
+  type: AttachmentType;
+  title: string;
+  data: any;
+}
+
 export interface ChatMessage {
   id: string;
   role: 'user' | 'model';
   content: string;
   timestamp: Date;
+  attachment?: ChatAttachment; // New: Support rich content
 }
 
 // --- SETTINGS & INTEGRATION ---
@@ -170,14 +182,16 @@ export interface DataSourceConfig {
   lastSync?: string;
 }
 
-export interface DataPipelineConfig {
-  id: string;
-  name: string;
-  sourceId: string; // References DataSourceConfig.id
-  targetEntity: 'Inventory' | 'Orders' | 'Production' | 'Graph'; // What aspect of the twin is updated
-  syncFrequency: 'realtime' | 'hourly' | 'daily' | 'manual';
-  aggregationLogic: string; // e.g. "SUM(quantity) WHERE warehouse_type='FG'"
-  active: boolean;
+// --- MCP (Model Context Protocol) ---
+export type MCPType = 'text2sql' | 'graph_topology' | 'simulation' | 'rag';
+
+export interface MCPDefinition {
+    id: MCPType;
+    name: string;
+    description: string;
+    icon: string; // Lucide Icon Name
+    color: string;
+    enabled: boolean;
 }
 
 // --- DOMAIN MODELING (ONTOLOGY) ---
@@ -216,13 +230,4 @@ export interface AISkill {
   description: string;
   linkedActionId?: string; // Links to Ontology Action
   isEnabled: boolean;
-}
-
-export interface AIAgentConfig {
-  id: string;
-  name: string;
-  role: string;
-  systemPrompt: string;
-  ragEnabled: boolean;
-  knowledgeBaseIds: string[];
 }

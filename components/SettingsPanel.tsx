@@ -7,9 +7,10 @@ import {
   AlertCircle, CheckCircle2, RefreshCw, Zap, Link as LinkIcon, Variable, 
   ChevronRight, Sparkles, Terminal, FileType, GitFork, Layers, Plug, Activity,
   Palette, Grid, Columns, Monitor, LayoutTemplate, Sun, Moon, Coffee, Droplets, Leaf,
-  Network, Key as KeyIcon, TableProperties, Workflow, MousePointerClick, MoreHorizontal
+  Network, Key as KeyIcon, TableProperties, Workflow, MousePointerClick, MoreHorizontal,
+  LayoutDashboard
 } from 'lucide-react';
-import { LLMConfig, DataSourceConfig, DataPipelineConfig, ObjectTypeDef, AISkill, ThemeConfig, LayoutMode, GlobalMode } from '../types';
+import { LLMConfig, DataSourceConfig, ObjectTypeDef, AISkill, ThemeConfig, LayoutMode, GlobalMode } from '../types';
 
 interface Props {
   currentConfig: LLMConfig;
@@ -67,6 +68,50 @@ const INITIAL_SKILLS: AISkill[] = [
     { id: 'skill-002', name: '订单智能重排', description: '当检测到产能冲突时，自动建议最优的订单排期调整方案。', isEnabled: true, linkedActionId: 'act_reschedule' },
     { id: 'skill-003', name: '供应链风险预演', description: '基于图谱拓扑结构，模拟上游断供对交付的影响范围。', isEnabled: false, linkedActionId: '' },
 ];
+
+// --- EXPORTED CONSTANTS & COMPONENTS FOR LAYOUT CONFIG ---
+const COLOR_OPTIONS = [
+    { class: 'bg-white', name: '纯净白 (Clean)' },
+    { class: 'bg-slate-50', name: '云雾灰 (Mist)' },
+    { class: 'bg-blue-50', name: '冰川蓝 (Ice)' },
+    { class: 'bg-emerald-50', name: '薄荷绿 (Mint)' },
+    { class: 'bg-amber-100', name: '纸莎草 (Papyrus)' },
+    { class: 'bg-slate-900', name: '暗夜黑 (Dark)' },
+    { class: 'bg-blue-700', name: '深海蓝 (Navy)' },
+    { class: 'bg-indigo-600', name: '睿智紫 (Indigo)' },
+    { class: 'bg-emerald-600', name: '森林绿 (Forest)' },
+    { class: 'bg-rose-600', name: '警示红 (Rose)' },
+];
+
+interface ColorPickerProps {
+    label: string;
+    value: string;
+    onChange: (v: string) => void;
+    options: {class: string, name: string}[];
+}
+
+const ColorPicker: React.FC<ColorPickerProps> = ({ label, value, onChange, options }) => (
+    <div className="bg-white border border-slate-200 rounded-xl p-4">
+        <label className="block text-sm font-bold text-slate-700 mb-3">{label}</label>
+        <div className="flex flex-wrap gap-2.5">
+            {options.map((opt) => {
+                const isLight = opt.class.includes('-50') || opt.class.includes('white') || opt.class.includes('100') || opt.class.includes('200');
+                return (
+                <button
+                    key={opt.class}
+                    onClick={() => onChange(opt.class)}
+                    className={`w-10 h-10 rounded-full border-2 transition-all flex items-center justify-center shadow-sm hover:shadow-md ${value === opt.class ? 'border-slate-800 ring-2 ring-slate-200 scale-110' : 'border-slate-100 hover:scale-110'}`}
+                    style={{ backgroundColor: opt.class.startsWith('bg-[#') ? opt.class.slice(4, -1) : undefined }}
+                    title={opt.name}
+                >
+                    <div className={`w-full h-full rounded-full ${opt.class}`}></div>
+                    {value === opt.class && <Check size={16} className={isLight ? 'text-slate-800' : 'text-white'} />}
+                </button>
+                );
+            })}
+        </div>
+    </div>
+);
 
 const SettingsPanel: React.FC<Props> = ({ currentConfig, themeConfig, onConfigSave, onThemeChange, onDataImport }) => {
   // Navigation State
@@ -477,29 +522,6 @@ const SettingsPanel: React.FC<Props> = ({ currentConfig, themeConfig, onConfigSa
   const renderLayoutConfig = () => {
       if (!themeConfig || !onThemeChange) return null;
 
-      const ColorPicker = ({ label, value, onChange, options }: { label: string, value: string, onChange: (v: string) => void, options: {class: string, name: string}[] }) => (
-          <div className="bg-white border border-slate-200 rounded-xl p-4">
-              <label className="block text-sm font-bold text-slate-700 mb-3">{label}</label>
-              <div className="flex flex-wrap gap-2.5">
-                  {options.map((opt) => {
-                      const isLight = opt.class.includes('-50') || opt.class.includes('white') || opt.class.includes('100') || opt.class.includes('200');
-                      return (
-                        <button
-                            key={opt.class}
-                            onClick={() => onChange(opt.class)}
-                            className={`w-10 h-10 rounded-full border-2 transition-all flex items-center justify-center shadow-sm hover:shadow-md ${value === opt.class ? 'border-slate-800 ring-2 ring-slate-200 scale-110' : 'border-slate-100 hover:scale-110'}`}
-                            style={{ backgroundColor: opt.class.startsWith('bg-[#') ? opt.class.slice(4, -1) : undefined }}
-                            title={opt.name}
-                        >
-                            <div className={`w-full h-full rounded-full ${opt.class}`}></div>
-                            {value === opt.class && <Check size={16} className={isLight ? 'text-slate-800' : 'text-white'} />}
-                        </button>
-                      );
-                  })}
-              </div>
-          </div>
-      );
-
       // Global Theme Selector Options
       const globalThemes = [
           { id: 'light', label: '极简白', desc: 'Default Light', icon: Sun, color: 'bg-slate-50', text: 'text-slate-800' },
@@ -507,6 +529,16 @@ const SettingsPanel: React.FC<Props> = ({ currentConfig, themeConfig, onConfigSa
           { id: 'warm', label: '护眼暖', desc: 'Soft Paper', icon: Coffee, color: 'bg-[#fdfbf7]', text: 'text-stone-700' },
           { id: 'cool', label: '海洋蓝', desc: 'Ocean Breeze', icon: Droplets, color: 'bg-blue-50', text: 'text-blue-900' },
           { id: 'fresh', label: '清新绿', desc: 'Forest Mint', icon: Leaf, color: 'bg-emerald-50', text: 'text-emerald-900' },
+      ];
+
+      // Card Config Map
+      const cardConfigMap = [
+          { key: 'heroColor', label: '全景拓扑卡片 (Hero Card)' },
+          { key: 'operationsColor', label: '运营看板卡片 (Operations)' },
+          { key: 'productionColor', label: '产线监控卡片 (Production)' },
+          { key: 'inventoryColor', label: '库存管理卡片 (Inventory)' },
+          { key: 'salesColor', label: '产销协同卡片 (Sales)' },
+          { key: 'capacityColor', label: '产能预测卡片 (Capacity)' },
       ];
 
       return (
@@ -521,7 +553,7 @@ const SettingsPanel: React.FC<Props> = ({ currentConfig, themeConfig, onConfigSa
                   </div>
               </div>
 
-              {/* Global Theme Selector (New) */}
+              {/* Global Theme Selector */}
               <div className="bg-white border border-slate-200 rounded-xl p-5">
                   <label className="block text-sm font-bold text-slate-700 mb-3">全局主题风格 (Global Theme)</label>
                   <div className="grid grid-cols-5 gap-3">
@@ -572,21 +604,17 @@ const SettingsPanel: React.FC<Props> = ({ currentConfig, themeConfig, onConfigSa
                   </div>
               </div>
 
-              {/* Specific Card Colors */}
-              <div className="grid grid-cols-1 gap-6">
-                  {/* Reuse existing color options logic */}
-                  <ColorPicker 
-                    label="全景拓扑卡片 (Hero Card)" 
-                    value={themeConfig.heroColor}
-                    onChange={(v) => onThemeChange({...themeConfig, heroColor: v})}
-                    options={[
-                        { class: 'bg-slate-900', name: 'Slate Dark' },
-                        { class: 'bg-emerald-600', name: 'Emerald Vibrant' },
-                        { class: 'bg-blue-600', name: 'Blue Vibrant' },
-                        { class: 'bg-indigo-600', name: 'Indigo Vibrant' },
-                        { class: 'bg-slate-100', name: 'Slate Light' },
-                    ]}
-                  />
+              {/* Specific Card Colors Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {cardConfigMap.map((card) => (
+                      <ColorPicker 
+                        key={card.key}
+                        label={card.label} 
+                        value={themeConfig[card.key as keyof ThemeConfig] as string}
+                        onChange={(v) => onThemeChange({...themeConfig, [card.key]: v})}
+                        options={COLOR_OPTIONS}
+                      />
+                  ))}
               </div>
           </div>
       );

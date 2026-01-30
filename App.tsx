@@ -14,8 +14,10 @@ import CapacityPanel from './components/CapacityPanel';
 import Tooltip from './components/Tooltip';
 import { AnomalyAnalysisModal } from './components/AnomalyAnalysisModal';
 import { MOCK_DATA, INITIAL_CONSTRAINTS } from './constants';
-import { GraphData, NodeData, ConstraintCategory, ScenarioConfig, ChatMessage, ConstraintItem, LLMConfig, ThemeConfig, LayoutMode, GlobalMode } from './types';
+import { GraphData, NodeData, ConstraintCategory, ScenarioConfig, ChatMessage, ConstraintItem, LLMConfig, ThemeConfig, LayoutMode, GlobalMode, AttachmentType, ChatAttachment } from './types';
 import { ComposedChart, Bar, Line, XAxis, Tooltip as RechartsTooltip, ResponsiveContainer, Cell } from 'recharts';
+import { db } from './services/db';
+import { executeText2SQL, executeGraphTopology } from './services/mcp';
 
 // Default Config
 const DEFAULT_LLM_CONFIG: LLMConfig = {
@@ -84,6 +86,7 @@ function App() {
   // View State
   const [activeView, setActiveView] = useState<'home' | 'graph_full' | 'dashboard' | 'inventory' | 'sales' | 'production' | 'capacity' | 'settings' | 'config' | 'scenario'>('home');
   const [isChatOpen, setIsChatOpen] = useState(false); 
+  const [isChatMaximized, setIsChatMaximized] = useState(false); // New state for full screen chat
   const [isFullScreen, setIsFullScreen] = useState(false);
 
   const [dimensions, setDimensions] = useState({ width: window.innerWidth, height: window.innerHeight - 64 }); 
@@ -99,11 +102,24 @@ function App() {
     {
       id: 'welcome',
       role: 'model',
-      content: '我是您的供应链智能助手。您可以勾选图谱中的节点（支持多选），进行联合异常推演。在对话中输入新的规则，我会自动为您沉淀到知识库。',
+      content: '我是您的供应链智能助手。已连接后台数据库 (IndexedDB)。您可以勾选上方的 MCP 插件进行增强推演，例如“Text2SQL”可直接查询订单状态。',
       timestamp: new Date()
     }
   ]);
   const [isAiThinking, setIsAiThinking] = useState(false);
+
+  // Initialize Database
+  useEffect(() => {
+      const initDB = async () => {
+          try {
+              await db.seed();
+              console.log("DB Service Initialized");
+          } catch (e) {
+              console.error("DB Init Failed", e);
+          }
+      };
+      initDB();
+  }, []);
 
   // --- Helpers for Contrast ---
   const isDark = (colorClass: string) => {
@@ -357,24 +373,79 @@ function App() {
       return { text: "未知的模型配置。", functionCalls: undefined };
   };
 
-  const handleUserMessage = async (text: string) => {
+  const handleUserMessage = async (text: string, activeMCPs: string[]) => {
     const userMsg: ChatMessage = { id: Date.now().toString(), role: 'user', content: text, timestamp: new Date() };
     setMessages(prev => [...prev, userMsg]);
     setIsAiThinking(true);
 
+    // --- MCP: Intelligent Execution Logic ---
+    let mcpResult = null;
+    let mcpType = '';
+    
+    // 1. Check for Text2SQL Intent
+    if (activeMCPs.includes('text2sql')) {
+        const entities = graphData.nodes.map(n => n.name);
+        const sqlResponse = await executeText2SQL(text, entities);
+        if (sqlResponse.result) {
+            mcpResult = sqlResponse.result;
+            mcpType = 'text2sql';
+            // If it is a simple query, we might show a chart
+            if (Array.isArray(mcpResult) && mcpResult.length > 0 && 'inventory' in mcpResult[0]) {
+                 setTimeout(() => {
+                    setMessages(prev => [...prev, { 
+                        id: Date.now().toString(), 
+                        role: 'model', 
+                        content: `✅ **Text2SQL 执行成功**\n\n${sqlResponse.explanation}\n\n已为您检索到相关库存数据：`, 
+                        timestamp: new Date(),
+                        attachment: {
+                            type: 'inventory_chart',
+                            title: '数据库检索结果',
+                            data: {
+                                history: [], // Simplify for demo
+                                current: mcpResult[0].inventory,
+                                safe: 2000,
+                                status: 'normal'
+                            }
+                        }
+                    }]);
+                    setIsAiThinking(false);
+                }, 800);
+                return;
+            }
+        }
+    }
+
+    // 2. Check for Graph Topology Intent
+    if (activeMCPs.includes('graph_topology') && !mcpResult) {
+        // Find mentioned node
+        const nodeName = graphData.nodes.find(n => text.includes(n.name))?.name;
+        if (nodeName) {
+            const topo = await executeGraphTopology(nodeName);
+            mcpResult = topo.result;
+            mcpType = 'graph_topology';
+        }
+    }
+
+    // -----------------------------------------------------
+    // Standard LLM / Fallback Logic
+    // -----------------------------------------------------
+
     try {
       const activeRules = constraints.flatMap(c => c.items).filter(i => i.enabled).map(i => `- ${i.label}: ${i.description}`).join('\n');
       
-      const systemPrompt = `你是一个供应链数字孪生系统的专家助手。你的目标是协助用户分析供应链风险、优化排产计划和管理库存。
+      let systemPrompt = `你是一个供应链数字孪生系统的专家助手。你的目标是协助用户分析供应链风险、优化排产计划和管理库存。
       
       当前系统状态摘要：
       - 节点数量: ${graphData.nodes.length} (涵盖供应商、基地、客户)
       - 活跃异常: ${graphData.nodes.filter(n=>n.status==='critical').length} 个
       
       当前生效的业务规则 (Constraints):
-      ${activeRules}
-      
-      请根据用户的输入提供专业的分析建议。如果用户提到具体的规则设定（例如"如果...则..."），请调用 learn_rule 工具来保存规则。`;
+      ${activeRules}`;
+
+      // Inject MCP Context if available
+      if (mcpResult) {
+          systemPrompt += `\n\n[MCP Context Injected - ${mcpType}]:\n${JSON.stringify(mcpResult, null, 2)}\n请基于上述数据库/图谱分析结果回答用户。`;
+      }
       
       const learnRuleTool = {
           functionDeclarations: [{
@@ -393,7 +464,6 @@ function App() {
           }]
       };
       
-      // Combine system prompt and user input for simple generateContent call
       const fullPrompt = `${systemPrompt}\n\n用户: ${text}`;
       
       const aiResult = await callAI(fullPrompt, [learnRuleTool]);
@@ -622,7 +692,10 @@ function App() {
            </button>
 
            <button 
-             onClick={() => setIsChatOpen(!isChatOpen)}
+             onClick={() => {
+                 setIsChatOpen(!isChatOpen);
+                 if (isChatMaximized) setIsChatMaximized(false); // Reset maximize on toggle
+             }}
              className={`p-2.5 rounded-full transition-all duration-300 relative ${isChatOpen ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200' : theme.globalMode === 'dark' ? 'bg-slate-800 border border-slate-700 text-slate-300 hover:text-white' : 'bg-white border border-slate-200 text-slate-500 hover:text-indigo-600'}`}
            >
              <MessageSquare size={22} />
@@ -903,10 +976,41 @@ function App() {
                 />
             )}
 
+            {/* Chat Modal - Dynamic Sizing */}
             {isChatOpen && (
-                <div className="absolute right-6 bottom-6 w-96 h-[600px] bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden z-50 animate-in slide-in-from-bottom-10 fade-in">
-                     <div className="flex items-center justify-between p-4 bg-slate-50 border-b border-slate-200"><span className="font-bold text-slate-700 flex items-center gap-2 text-base"><MessageSquare size={18}/> 智能助手</span><button onClick={() => setIsChatOpen(false)} className="text-slate-400 hover:text-slate-600"><ChevronLeft className="rotate-[-90deg]" size={18}/></button></div>
-                     <div className="h-[calc(100%-60px)]"><AIChat messages={messages} onSendMessage={handleUserMessage} isThinking={isAiThinking}/></div>
+                <div className={`fixed z-[60] bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden transition-all duration-300 ease-in-out flex flex-col ${
+                    isChatMaximized 
+                    ? 'inset-4 w-auto h-auto rounded-xl' 
+                    : 'right-6 bottom-6 w-96 h-[600px] animate-in slide-in-from-bottom-10 fade-in'
+                }`}>
+                     <div className="flex items-center justify-between p-4 bg-slate-50 border-b border-slate-200 shrink-0">
+                         <span className="font-bold text-slate-700 flex items-center gap-2 text-base">
+                             <MessageSquare size={18} className="text-indigo-600"/> 智能推演助手
+                         </span>
+                         <div className="flex items-center gap-2">
+                             <button 
+                                onClick={() => setIsChatMaximized(!isChatMaximized)} 
+                                className="text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 p-1.5 rounded transition-colors"
+                                title={isChatMaximized ? "Minimize" : "Maximize"}
+                             >
+                                 {isChatMaximized ? <Minimize size={18}/> : <Maximize size={18}/>}
+                             </button>
+                             <button 
+                                onClick={() => setIsChatOpen(false)} 
+                                className="text-slate-400 hover:text-red-500 hover:bg-red-50 p-1.5 rounded transition-colors"
+                             >
+                                 <ChevronLeft className="rotate-[-90deg]" size={18}/>
+                             </button>
+                         </div>
+                     </div>
+                     <div className="flex-1 overflow-hidden">
+                         <AIChat 
+                            messages={messages} 
+                            onSendMessage={handleUserMessage} 
+                            isThinking={isAiThinking}
+                            isMaximized={isChatMaximized}
+                         />
+                     </div>
                 </div>
             )}
         </div>
