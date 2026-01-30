@@ -1,14 +1,15 @@
-
 import React, { useMemo } from 'react';
-import { GraphData, NodeType } from '../types';
+import { GraphData, NodeType, ThemeConfig } from '../types';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Cell, PieChart, Pie, Legend, LineChart, Line, ComposedChart } from 'recharts';
-import { Activity, Package, TrendingUp, AlertTriangle, Database, Zap, Truck, Factory, BarChart4 } from 'lucide-react';
+import { Activity, Package, TrendingUp, AlertTriangle, Database, Zap, Truck, Factory, BarChart4, ArrowUpRight, LayoutDashboard, Network } from 'lucide-react';
 
 interface Props {
   data: GraphData;
+  themeConfig?: ThemeConfig;
+  onNavigate?: (view: string) => void;
 }
 
-const DashboardPanel: React.FC<Props> = ({ data }) => {
+const DashboardPanel: React.FC<Props> = ({ data, themeConfig, onNavigate }) => {
   // --- Data Aggregation Logic ---
   const metrics = useMemo(() => {
     const nodes = data.nodes;
@@ -83,36 +84,9 @@ const DashboardPanel: React.FC<Props> = ({ data }) => {
     { name: '异常', value: metrics.healthCounts.critical, color: '#ef4444' },
   ];
 
-  // Custom Tooltip for Forecast Chart
-  const ForecastTooltip = ({ active, payload, label }: any) => {
-      if (active && payload && payload.length) {
-          const data = payload[0].payload;
-          return (
-              <div className="bg-white p-3 border border-slate-200 rounded shadow-lg text-sm">
-                  <div className="font-bold text-slate-700 mb-1">{data.fullName}</div>
-                  <div className="flex justify-between gap-4 mb-1">
-                      <span className="text-slate-500">预测:</span>
-                      <span className="font-mono">{data.forecast.toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between gap-4 mb-1">
-                      <span className="text-slate-500">实际:</span>
-                      <span className="font-mono">{data.orders.toLocaleString()}</span>
-                  </div>
-                  <div className="pt-1 border-t border-slate-100 flex justify-between gap-4">
-                      <span className="text-slate-500">偏差率:</span>
-                      <span className={`font-bold ${data.isHighDeviation ? 'text-red-600' : 'text-emerald-600'}`}>
-                          {(data.deviation * 100).toFixed(1)}%
-                      </span>
-                  </div>
-                  {data.isHighDeviation && (
-                      <div className="text-xs text-red-500 mt-1 flex items-center gap-1">
-                          <AlertTriangle size={12}/> 偏差过大 ({'>'}20%)
-                      </div>
-                  )}
-              </div>
-          );
-      }
-      return null;
+  // Helper for Navigation Click
+  const handleNav = (view: string) => {
+      if (onNavigate) onNavigate(view);
   };
 
   return (
@@ -120,186 +94,234 @@ const DashboardPanel: React.FC<Props> = ({ data }) => {
        <div className="p-6 border-b border-slate-200 bg-white sticky top-0 z-10 flex items-center justify-between">
             <div>
                 <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-                    <Activity className="text-blue-600" size={24}/>
-                    全局运营看板
+                    <LayoutDashboard className="text-indigo-600" size={24}/>
+                    全局运营指挥中心 (Global Operations Hub)
                 </h2>
-                <p className="text-sm text-slate-500 mt-1">Real-time Supply Chain Analytics</p>
+                <p className="text-sm text-slate-500 mt-1">Foundry Application Portal - Select a module to manage.</p>
             </div>
             <div className="px-3 py-1 bg-green-100 text-green-700 text-xs font-bold rounded-full flex items-center gap-1">
-                <Zap size={14}/> Live
+                <Zap size={14}/> Live Status: Connected
             </div>
        </div>
 
        <div className="flex-1 overflow-y-auto p-6 space-y-6">
             
-            {/* 1. Health & Alerts */}
-            <div className="grid grid-cols-2 gap-6">
-                <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
-                    <h3 className="text-sm font-bold text-slate-500 uppercase mb-3 flex items-center gap-1">
-                        <AlertTriangle size={16}/> 节点健康分布
-                    </h3>
-                    <div className="h-28 flex items-center">
-                        <ResponsiveContainer width="50%" height="100%">
-                            <PieChart>
-                                <Pie 
-                                    data={healthDataPie} 
-                                    innerRadius={30} 
-                                    outerRadius={50} 
-                                    paddingAngle={2} 
-                                    dataKey="value"
-                                >
-                                    {healthDataPie.map((entry, index) => (
-                                        <Cell key={`cell-${index}`} fill={entry.color} />
-                                    ))}
-                                </Pie>
-                            </PieChart>
-                        </ResponsiveContainer>
-                        <div className="flex-1 space-y-2">
-                            {healthDataPie.map(item => (
-                                <div key={item.name} className="flex justify-between text-sm">
-                                    <span className="flex items-center gap-2 text-slate-500">
-                                        <div className="w-2.5 h-2.5 rounded-full" style={{background: item.color}}></div>
-                                        {item.name}
-                                    </span>
-                                    <span className="font-bold">{item.value}</span>
+            {/* Grid Layout for App Cards */}
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-6">
+                
+                {/* 1. Topology & Health (Hero Card) */}
+                <div 
+                    onClick={() => handleNav('graph')}
+                    className={`${themeConfig?.heroColor || 'bg-white'} col-span-2 p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-xl hover:border-indigo-300 transition-all cursor-pointer group relative overflow-hidden`}
+                >
+                    <div className="absolute top-4 right-4 bg-white/50 p-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
+                        <ArrowUpRight size={20} className="text-indigo-600"/>
+                    </div>
+                    
+                    <div className="flex justify-between items-start mb-6">
+                        <div>
+                            <h3 className="text-lg font-bold text-slate-700 flex items-center gap-2">
+                                <Network size={20} className="text-indigo-500"/> 全景拓扑监控 (Network Topology)
+                            </h3>
+                            <p className="text-sm text-slate-500 mt-1">实时监控全网节点状态与物流路径</p>
+                        </div>
+                        <div className="text-right">
+                            <span className="text-3xl font-bold text-slate-800">{metrics.healthCounts.normal + metrics.healthCounts.warning + metrics.healthCounts.critical}</span>
+                            <div className="text-xs text-slate-400 uppercase">Active Nodes</div>
+                        </div>
+                    </div>
+
+                    <div className="flex gap-8">
+                        {/* Mini Pie */}
+                        <div className="h-32 w-32 relative">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <PieChart>
+                                    <Pie data={healthDataPie} innerRadius={25} outerRadius={40} paddingAngle={2} dataKey="value">
+                                        {healthDataPie.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
+                                    </Pie>
+                                </PieChart>
+                            </ResponsiveContainer>
+                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                <div className="text-center">
+                                    <span className="block text-xs text-slate-400">异常</span>
+                                    <span className="block text-lg font-bold text-red-500">{metrics.healthCounts.critical}</span>
                                 </div>
-                            ))}
+                            </div>
+                        </div>
+                        
+                        {/* Stats List */}
+                        <div className="flex-1 space-y-3 pt-2">
+                            <div className="flex justify-between items-center p-2 bg-slate-50 rounded border border-slate-100">
+                                <span className="text-sm font-medium text-slate-600">工厂节点</span>
+                                <span className="font-bold text-slate-800">10 Bases</span>
+                            </div>
+                            <div className="flex justify-between items-center p-2 bg-slate-50 rounded border border-slate-100">
+                                <span className="text-sm font-medium text-slate-600">供应商</span>
+                                <span className="font-bold text-slate-800">10 Suppliers</span>
+                            </div>
+                            <div className="flex justify-between items-center p-2 bg-slate-50 rounded border border-slate-100">
+                                <span className="text-sm font-medium text-slate-600">核心客户</span>
+                                <span className="font-bold text-slate-800">7 Accounts</span>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
-                     <h3 className="text-sm font-bold text-slate-500 uppercase flex items-center gap-1">
-                        <Factory size={16}/> 产线综合效率 (OEE)
-                    </h3>
-                    <div className="flex items-end gap-1 mt-2">
-                        <span className="text-4xl font-bold text-indigo-600">{metrics.avgOEE.toFixed(1)}</span>
-                        <span className="text-lg font-bold text-slate-400 mb-1">%</span>
+                {/* 2. Capacity App Card */}
+                <div 
+                    onClick={() => handleNav('capacity')}
+                    className={`${themeConfig?.capacityColor || 'bg-white'} p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-xl hover:border-orange-300 transition-all cursor-pointer group relative`}
+                >
+                    <div className="absolute top-4 right-4 bg-white/50 p-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
+                        <ArrowUpRight size={20} className="text-orange-600"/>
                     </div>
-                    <div className="w-full bg-slate-100 rounded-full h-3 mt-3">
+                    <div className="mb-4">
+                        <h3 className="text-lg font-bold text-slate-700 flex items-center gap-2">
+                            <BarChart4 size={20} className="text-orange-500"/> 产能预测 (Capacity)
+                        </h3>
+                        <p className="text-sm text-slate-500 mt-1">12个月滚动资源规划 (RCP)</p>
+                    </div>
+                    <div className="h-28 w-full pointer-events-none">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <ComposedChart data={capacitySummaryData}>
+                                <Bar dataKey="demand" fill="#cbd5e1" barSize={8} radius={[2,2,0,0]} />
+                                <Line type="monotone" dataKey="capacity" stroke="#f97316" strokeWidth={2} dot={false} />
+                            </ComposedChart>
+                        </ResponsiveContainer>
+                    </div>
+                    <div className="mt-2 text-xs font-bold text-orange-600 flex items-center gap-1">
+                        <AlertTriangle size={12}/> 发现未来 3 个瓶颈月
+                    </div>
+                </div>
+
+                {/* 3. Inventory App Card */}
+                <div 
+                    onClick={() => handleNav('inventory')}
+                    className={`${themeConfig?.inventoryColor || 'bg-white'} p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-xl hover:border-blue-300 transition-all cursor-pointer group relative`}
+                >
+                    <div className="absolute top-4 right-4 bg-white/50 p-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
+                        <ArrowUpRight size={20} className="text-blue-600"/>
+                    </div>
+                    <div className="mb-4">
+                        <h3 className="text-lg font-bold text-slate-700 flex items-center gap-2">
+                            <Database size={20} className="text-blue-500"/> 库存健康 (Inventory)
+                        </h3>
+                        <p className="text-sm text-slate-500 mt-1">多级库存水位监控</p>
+                    </div>
+                    <div className="flex items-end justify-between mb-4">
+                        <div>
+                            <div className="text-3xl font-bold text-slate-800">
+                                {(metrics.totalInventory / 10000).toFixed(1)} <span className="text-sm font-normal text-slate-400">万Ah</span>
+                            </div>
+                            <div className="text-xs text-emerald-600 font-bold flex items-center gap-1 mt-1">
+                                <TrendingUp size={12}/> 环比 +4.2%
+                            </div>
+                        </div>
+                    </div>
+                    <div className="h-16 w-full pointer-events-none">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <AreaChart data={inventoryTrendData}>
+                                <defs>
+                                    <linearGradient id="miniInv" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
+                                        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                                    </linearGradient>
+                                </defs>
+                                <Area type="monotone" dataKey="value" stroke="#3b82f6" strokeWidth={2} fill="url(#miniInv)" />
+                            </AreaChart>
+                        </ResponsiveContainer>
+                    </div>
+                </div>
+
+                {/* 4. Sales & Ops App Card */}
+                <div 
+                    onClick={() => handleNav('sales')}
+                    className={`${themeConfig?.salesColor || 'bg-white'} p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-xl hover:border-emerald-300 transition-all cursor-pointer group relative`}
+                >
+                    <div className="absolute top-4 right-4 bg-white/50 p-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
+                        <ArrowUpRight size={20} className="text-emerald-600"/>
+                    </div>
+                    <div className="mb-4">
+                        <h3 className="text-lg font-bold text-slate-700 flex items-center gap-2">
+                            <Package size={20} className="text-emerald-500"/> 产销协同 (S&OP)
+                        </h3>
+                        <p className="text-sm text-slate-500 mt-1">订单交付与需求偏差分析</p>
+                    </div>
+                    <div className="space-y-3">
+                        {metrics.demandData.slice(0, 3).map((item, i) => (
+                            <div key={i} className="flex items-center justify-between text-sm">
+                                <span className="font-medium text-slate-600">{item.name}</span>
+                                <div className="flex items-center gap-3">
+                                    <div className="w-24 bg-slate-100 rounded-full h-2">
+                                        <div 
+                                            className={`h-2 rounded-full ${item.isHighDeviation ? 'bg-red-400' : 'bg-emerald-400'}`} 
+                                            style={{width: `${Math.min(100, (item.orders/item.forecast)*100)}%`}}
+                                        ></div>
+                                    </div>
+                                    <span className={`text-xs font-bold ${item.isHighDeviation ? 'text-red-500' : 'text-slate-400'}`}>
+                                        {(item.deviation * 100).toFixed(0)}%
+                                    </span>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                {/* 5. Production App Card */}
+                <div 
+                    onClick={() => handleNav('production')}
+                    className={`${themeConfig?.productionColor || 'bg-white'} p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-xl hover:border-purple-300 transition-all cursor-pointer group relative`}
+                >
+                    <div className="absolute top-4 right-4 bg-white/50 p-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
+                        <ArrowUpRight size={20} className="text-purple-600"/>
+                    </div>
+                    <div className="mb-4">
+                        <h3 className="text-lg font-bold text-slate-700 flex items-center gap-2">
+                            <Factory size={20} className="text-purple-500"/> 产线监视 (MES)
+                        </h3>
+                        <p className="text-sm text-slate-500 mt-1">实时设备效率 OEE</p>
+                    </div>
+                    <div className="flex items-end gap-2 mt-6">
+                        <span className="text-5xl font-bold text-indigo-600">{metrics.avgOEE.toFixed(1)}</span>
+                        <span className="text-xl font-bold text-slate-400 mb-2">%</span>
+                    </div>
+                    <div className="w-full bg-slate-100 rounded-full h-4 mt-4 overflow-hidden">
                         <div 
-                            className="h-3 rounded-full bg-indigo-500 transition-all duration-1000" 
+                            className="h-4 rounded-full bg-gradient-to-r from-indigo-400 to-purple-500 transition-all duration-1000" 
                             style={{width: `${metrics.avgOEE}%`}}
                         ></div>
                     </div>
                 </div>
-            </div>
 
-            {/* 2. Inventory Overview (Updated with 30-day sparkline) */}
-            <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
-                <div className="flex justify-between items-start mb-4">
-                    <h3 className="text-sm font-bold text-slate-500 uppercase flex items-center gap-1">
-                        <Database size={16}/> 全网库存水位 (30天趋势)
-                    </h3>
-                    <div className="text-right">
-                        <div className="text-3xl font-bold text-slate-800">
-                            {(metrics.totalInventory / 10000).toFixed(2)}
-                            <span className="text-base text-slate-400 font-normal ml-1">万Ah</span>
-                        </div>
-                        <div className="text-xs text-emerald-600 font-bold flex items-center justify-end gap-1 mt-1">
-                            <TrendingUp size={12}/> 环比 +4.2%
-                        </div>
+                {/* 6. Supply App Card (Material) */}
+                <div className={`${themeConfig?.operationsColor || 'bg-white'} p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-xl hover:border-blue-300 transition-all cursor-pointer group relative`}>
+                    <div className="absolute top-4 right-4 bg-white/50 p-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
+                        <ArrowUpRight size={20} className="text-blue-600"/>
+                    </div>
+                    <div className="mb-4">
+                        <h3 className="text-lg font-bold text-slate-700 flex items-center gap-2">
+                            <Truck size={20} className="text-blue-500"/> 物料供应 (Supply)
+                        </h3>
+                        <p className="text-sm text-slate-500 mt-1">上游原材料到货监控</p>
+                    </div>
+                    <div className="space-y-4">
+                        {[
+                            { name: '碳酸锂', status: '充足', stock: '240T' },
+                            { name: 'PVDF', status: '紧张', stock: '15T' },
+                            { name: '石墨', status: '充足', stock: '850T' },
+                        ].map((item, i) => (
+                            <div key={i} className="flex justify-between items-center border-b border-slate-50 pb-2 last:border-0">
+                                <span className="text-sm font-medium text-slate-700">{item.name}</span>
+                                <div className="flex items-center gap-2">
+                                    <span className="text-xs font-mono text-slate-500">{item.stock}</span>
+                                    <span className={`w-2 h-2 rounded-full ${item.status === '充足' ? 'bg-emerald-500' : 'bg-amber-500'}`}></span>
+                                </div>
+                            </div>
+                        ))}
                     </div>
                 </div>
-                <div className="h-40 w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={inventoryTrendData}>
-                            <defs>
-                                <linearGradient id="colorTotalInv" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.2}/>
-                                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
-                                </linearGradient>
-                            </defs>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9"/>
-                            <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#94a3b8'}} interval={3} />
-                            <Tooltip contentStyle={{fontSize: '14px'}}/>
-                            <Area type="monotone" dataKey="value" stroke="#3b82f6" strokeWidth={3} fillOpacity={1} fill="url(#colorTotalInv)" />
-                        </AreaChart>
-                    </ResponsiveContainer>
-                </div>
-            </div>
 
-            {/* 3. NEW: Capacity Forecast Summary */}
-            <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm hover:border-orange-200 transition-colors group cursor-pointer" onClick={() => (window as any).setActiveView?.('capacity')}>
-                <div className="flex justify-between items-start mb-4">
-                    <h3 className="text-sm font-bold text-slate-500 uppercase flex items-center gap-1">
-                        <BarChart4 size={16}/> 12个月产能滚动预测
-                    </h3>
-                    <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded font-bold group-hover:bg-orange-200">M8 瓶颈预警</span>
-                </div>
-                <div className="h-40 w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                        <ComposedChart data={capacitySummaryData}>
-                            <XAxis dataKey="name" hide/>
-                            <Tooltip cursor={{fill: '#f8fafc'}} contentStyle={{fontSize: '12px'}}/>
-                            <Bar dataKey="demand" fill="#94a3b8" barSize={12} radius={[2,2,0,0]} name="需求"/>
-                            <Line type="monotone" dataKey="capacity" stroke="#f97316" strokeWidth={2} dot={false} name="产能"/>
-                        </ComposedChart>
-                    </ResponsiveContainer>
-                </div>
-                <div className="text-center text-xs text-blue-600 font-bold mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                    点击查看详细工艺分析 &rarr;
-                </div>
             </div>
-
-            {/* 4. Forecast vs Demand (UPDATED with Alert Logic) */}
-            <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
-                <h3 className="text-sm font-bold text-slate-500 uppercase mb-4 flex items-center gap-1">
-                    <Package size={16}/> 客户预测 vs 实际订单
-                </h3>
-                <div className="h-60 w-full">
-                     <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={metrics.demandData} layout="vertical" margin={{left: 20, right: 10}}>
-                            <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#f1f5f9"/>
-                            <XAxis type="number" hide/>
-                            <YAxis dataKey="name" type="category" width={90} tick={{fontSize: 12, fill: '#64748b'}} axisLine={false} tickLine={false}/>
-                            <Tooltip cursor={{fill: '#f8fafc'}} content={<ForecastTooltip />} />
-                            <Legend wrapperStyle={{fontSize: '12px'}}/>
-                            <Bar dataKey="forecast" name="预测需求" fill="#cbd5e1" radius={[0, 4, 4, 0]} barSize={12} />
-                            
-                            {/* Conditional Rendering for Order Bars */}
-                            <Bar dataKey="orders" name="在手订单" radius={[0, 4, 4, 0]} barSize={12}>
-                                {metrics.demandData.map((entry, index) => (
-                                    <Cell 
-                                        key={`cell-${index}`} 
-                                        fill={entry.isHighDeviation ? '#ef4444' : '#3b82f6'} 
-                                    />
-                                ))}
-                            </Bar>
-                        </BarChart>
-                    </ResponsiveContainer>
-                </div>
-                <div className="flex justify-end gap-4 mt-3 text-xs text-slate-400">
-                     <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 bg-slate-300 rounded-sm"></div>预测</div>
-                     <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 bg-blue-500 rounded-sm"></div>正常订单</div>
-                     <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 bg-red-500 rounded-sm"></div>偏差{'>'}20%</div>
-                </div>
-            </div>
-
-            {/* 5. Material Data List */}
-            <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
-                 <h3 className="text-sm font-bold text-slate-500 uppercase mb-3 flex items-center gap-1">
-                    <Truck size={16}/> 关键物料供应监控
-                </h3>
-                <div className="space-y-3">
-                    {[
-                        { name: '电池级碳酸锂', status: '充足', trend: 'stable', stock: '240T' },
-                        { name: 'PVDF粘结剂', status: '紧张', trend: 'down', stock: '15T' },
-                        { name: '负极石墨', status: '充足', trend: 'up', stock: '850T' },
-                    ].map((item, i) => (
-                        <div key={i} className="flex items-center justify-between p-3 bg-slate-50 rounded border border-slate-100 text-sm">
-                            <span className="font-medium text-slate-700">{item.name}</span>
-                            <div className="flex items-center gap-4">
-                                <span className="font-mono text-slate-600">{item.stock}</span>
-                                <span className={`px-2 py-0.5 rounded ${
-                                    item.status === '充足' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
-                                } font-bold text-xs`}>{item.status}</span>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            </div>
-
        </div>
     </div>
   );

@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { ConstraintCategory, ConstraintItem, NodeData, NodeType, ScenarioConfig, ConstraintLogic, ConstraintRelationType } from '../types';
-import { Settings, Sliders, Activity, Zap, Search, Plus, Save, X, Sparkles, Trash2, List, Edit2, ArrowDown, GitCommit, Database as DbIcon, Link as LinkIcon, AlertTriangle, BrainCircuit, Truck, TrendingUp, Factory, Package } from 'lucide-react';
+import { Settings, Sliders, Activity, Zap, Search, Plus, Save, X, Sparkles, Trash2, List, Edit2, ArrowDown, GitCommit, Database, Link as LinkIcon, AlertTriangle, BrainCircuit, Truck, TrendingUp, Factory, Package, ShoppingCart, Calendar, Layers, CheckCircle2, AlertCircle, RefreshCw, Upload, FileText, Clock } from 'lucide-react';
 
 interface Props {
   constraints: ConstraintCategory[];
@@ -10,9 +10,68 @@ interface Props {
   onRunSimulation: (configs: ScenarioConfig[]) => void;
   onAnalyzeConstraint: (text: string) => Promise<Partial<ConstraintItem>>;
   onAddConstraint: (item: ConstraintItem) => void;
+  onDataImport: (type: 'graph' | 'inventory' | 'orders' | 'production', data: any) => void;
   isSimulating: boolean;
-  initialTab?: 'constraints' | 'scenarios'; // New Prop
+  initialTab?: 'constraints' | 'scenarios' | 'data';
 }
+
+const MANUFACTURING_DATA_TYPES = [
+    { 
+        id: 'sales', 
+        name: '销售订单 (Sales)', 
+        sub: 'Customer Demand',
+        icon: ShoppingCart, 
+        lastUpdate: '2023-10-26 14:30', 
+        status: 'synced', 
+        count: '12,405 Orders',
+        desc: 'ERP系统同步 (SAP SD)',
+        color: 'text-blue-600 bg-blue-50'
+    },
+    { 
+        id: 'mps', 
+        name: '主生产计划 (MPS)', 
+        sub: 'Production Plan',
+        icon: Calendar, 
+        lastUpdate: '2023-10-26 09:00', 
+        status: 'synced', 
+        count: 'Ver. 2023-W43',
+        desc: 'APS排产结果 (Siemens Opcenter)',
+        color: 'text-purple-600 bg-purple-50'
+    },
+    { 
+        id: 'bom', 
+        name: '物料清单 (BOM)', 
+        sub: 'Product Structure',
+        icon: Layers, 
+        lastUpdate: '2023-10-25 18:00', 
+        status: 'warning', 
+        count: '856 Active BOMs',
+        desc: 'PLM变更待确认 (Teamcenter)',
+        color: 'text-amber-600 bg-amber-50'
+    },
+    { 
+        id: 'inv', 
+        name: '库存快照 (Inventory)', 
+        sub: 'Stock Levels',
+        icon: Package, 
+        lastUpdate: 'Just now', 
+        status: 'synced', 
+        count: '99.8% Accuracy',
+        desc: 'WMS实时水位 (Infor)',
+        color: 'text-emerald-600 bg-emerald-50'
+    },
+    { 
+        id: 'logistics', 
+        name: '物流台账 (Logistics)', 
+        sub: 'In-Transit',
+        icon: Truck, 
+        lastUpdate: '1 hour ago', 
+        status: 'error', 
+        count: '3 Exceptions',
+        desc: 'TMS异常件 (G7)',
+        color: 'text-red-600 bg-red-50'
+    }
+];
 
 const ConstraintPanel: React.FC<Props> = ({ 
     constraints, 
@@ -21,10 +80,11 @@ const ConstraintPanel: React.FC<Props> = ({
     onRunSimulation, 
     onAnalyzeConstraint,
     onAddConstraint,
+    onDataImport,
     isSimulating,
     initialTab = 'scenarios'
 }) => {
-  const [activeTab, setActiveTab] = useState<'constraints' | 'scenarios'>(initialTab);
+  const [activeTab, setActiveTab] = useState<'constraints' | 'scenarios' | 'data'>(initialTab);
   
   // Sync tab when prop changes (e.g. clicking different sidebar icons)
   useEffect(() => {
@@ -213,6 +273,13 @@ const ConstraintPanel: React.FC<Props> = ({
             场景模拟 (Simulation)
         </button>
         <button 
+            className={`flex-1 py-4 text-sm font-bold flex items-center justify-center gap-2 transition-all border-b-2 ${activeTab === 'data' ? 'text-indigo-600 border-indigo-600 bg-indigo-50/30' : 'text-slate-500 border-transparent hover:bg-slate-50'}`}
+            onClick={() => setActiveTab('data')}
+        >
+            <Database size={16} />
+            数据接入 (Data)
+        </button>
+        <button 
             className={`flex-1 py-4 text-sm font-bold flex items-center justify-center gap-2 transition-all border-b-2 ${activeTab === 'constraints' ? 'text-indigo-600 border-indigo-600 bg-indigo-50/30' : 'text-slate-500 border-transparent hover:bg-slate-50'}`}
             onClick={() => setActiveTab('constraints')}
         >
@@ -222,7 +289,82 @@ const ConstraintPanel: React.FC<Props> = ({
       </div>
 
       <div className="flex-1 overflow-hidden relative">
-        {activeTab === 'constraints' ? (
+        
+        {/* === TAB 1: DATA MATRIX (New) === */}
+        {activeTab === 'data' && (
+            <div className="h-full overflow-y-auto bg-slate-50/50 p-8 custom-scrollbar">
+                <div className="max-w-5xl mx-auto animate-in fade-in slide-in-from-bottom-2">
+                    <div className="flex justify-between items-center mb-8">
+                        <div>
+                            <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                                数据接入中心 (Data Hub)
+                            </h3>
+                            <p className="text-sm text-slate-500 mt-1">离散制造核心数据对象管理。点击卡片更新或查看详情。</p>
+                        </div>
+                        <button className="px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-bold text-slate-600 shadow-sm hover:bg-slate-50 hover:text-indigo-600 transition-colors flex items-center gap-2">
+                            <RefreshCw size={16}/> 全量同步
+                        </button>
+                    </div>
+
+                    <div className="grid grid-cols-2 lg:grid-cols-3 gap-6">
+                        {MANUFACTURING_DATA_TYPES.map((item) => (
+                            <div key={item.id} className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm hover:shadow-md hover:border-indigo-300 transition-all cursor-pointer group relative overflow-hidden flex flex-col h-56">
+                                <div className="flex justify-between items-start mb-4">
+                                    <div className={`p-3 rounded-xl ${item.color}`}>
+                                        <item.icon size={24} />
+                                    </div>
+                                    <div className={`text-[10px] font-bold px-2 py-1 rounded-full flex items-center gap-1 border ${
+                                        item.status === 'synced' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 
+                                        item.status === 'warning' ? 'bg-amber-50 text-amber-600 border-amber-100' : 'bg-red-50 text-red-600 border-red-100'
+                                    }`}>
+                                        {item.status === 'synced' ? <CheckCircle2 size={10}/> : <AlertCircle size={10}/>}
+                                        {item.status === 'synced' ? '已同步' : item.status === 'warning' ? '待确认' : '连接异常'}
+                                    </div>
+                                </div>
+                                
+                                <div className="flex-1">
+                                    <h4 className="text-lg font-bold text-slate-800 leading-tight">{item.name}</h4>
+                                    <p className="text-xs font-medium text-slate-400 mt-1">{item.sub}</p>
+                                    <p className="text-xs text-slate-500 mt-3 line-clamp-1">{item.desc}</p>
+                                </div>
+                                
+                                <div className="flex items-center justify-between pt-4 border-t border-slate-100 mt-auto">
+                                    <div className="text-[10px] text-slate-400 flex items-center gap-1">
+                                        <Clock size={10}/>
+                                        {item.lastUpdate}
+                                    </div>
+                                    <div className="text-xs font-mono font-bold text-slate-700 bg-slate-50 px-2 py-0.5 rounded border border-slate-100">
+                                        {item.count}
+                                    </div>
+                                </div>
+
+                                {/* Hover Action Overlay */}
+                                <div className="absolute inset-0 bg-white/95 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity gap-3 z-10 backdrop-blur-sm">
+                                    <button className="w-32 py-2.5 bg-indigo-600 text-white rounded-lg font-bold text-xs shadow-md hover:bg-indigo-700 flex items-center justify-center gap-2 transform translate-y-2 group-hover:translate-y-0 transition-transform">
+                                        <Upload size={14}/> 导入文件
+                                    </button>
+                                    <button className="w-32 py-2.5 bg-white border border-slate-300 text-slate-700 rounded-lg font-bold text-xs shadow-sm hover:bg-slate-50 flex items-center justify-center gap-2 transform translate-y-2 group-hover:translate-y-0 transition-transform delay-75">
+                                        <Database size={14}/> 查看明细
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                        
+                        {/* Add New Source Card */}
+                        <div className="border-2 border-dashed border-slate-200 rounded-xl flex flex-col items-center justify-center p-6 text-slate-400 hover:border-indigo-400 hover:text-indigo-500 hover:bg-indigo-50 transition-all cursor-pointer h-56 group bg-slate-50/50">
+                            <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-sm mb-3 group-hover:scale-110 transition-transform text-slate-300 group-hover:text-indigo-500">
+                                <Plus size={24}/>
+                            </div>
+                            <span className="font-bold text-sm">添加自定义数据源</span>
+                            <span className="text-xs mt-1 opacity-60">支持 Excel/CSV/API</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        )}
+
+        {/* === TAB 2: RULES CONFIGURATION (Existing) === */}
+        {activeTab === 'constraints' && (
            // CONSTRAINTS VIEW: Centered layout with max-width
            <div className="h-full overflow-y-auto bg-slate-50/50 p-6 custom-scrollbar">
               <div className="max-w-2xl mx-auto space-y-6 pb-10">
@@ -394,7 +536,7 @@ const ConstraintPanel: React.FC<Props> = ({
                               <div className="relative z-10 bg-white border border-slate-200 rounded-lg p-4 space-y-3 shadow-sm">
                                     <div className="absolute -left-[25px] top-4 w-4 h-4 rounded-full bg-slate-200 border-2 border-white"></div>
                                     <div className="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase">
-                                        <DbIcon size={14} className="text-emerald-500"/> 影响对象/动作 (Object)
+                                        <Database size={14} className="text-emerald-500"/> 影响对象/动作 (Object)
                                     </div>
                                      <select 
                                         className="w-full text-sm border border-slate-300 rounded-lg p-2.5 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-100 outline-none transition-all"
@@ -464,7 +606,10 @@ const ConstraintPanel: React.FC<Props> = ({
                   )}
               </div>
            </div>
-        ) : (
+        )}
+
+        {/* === TAB 3: SCENARIOS (Existing) === */}
+        {activeTab === 'scenarios' && (
           // SCENARIOS VIEW: Split Layout (Builder Left / Queue Right)
           <div className="flex h-full">
              

@@ -64,6 +64,20 @@ export default function App() {
       capacityColor: 'bg-white'
   });
 
+  // --- Layout Calculation ---
+  const [windowSize, setWindowSize] = useState({ width: window.innerWidth, height: window.innerHeight });
+
+  useEffect(() => {
+    const handleResize = () => setWindowSize({ width: window.innerWidth, height: window.innerHeight });
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Calculate dynamic content width
+  const sidebarWidth = isSidebarCollapsed ? 80 : 256;
+  const rightPanelWidth = (isChatOpen && activeView !== 'settings' && activeView !== 'scenario') ? 384 : 0;
+  const contentWidth = windowSize.width - sidebarWidth - rightPanelWidth;
+
   // --- Effects ---
   useEffect(() => {
     // Initialize DB
@@ -239,12 +253,18 @@ export default function App() {
 
   const renderContent = () => {
       switch (activeView) {
-          case 'dashboard': return <DashboardPanel data={graphData} themeConfig={themeConfig} />;
+          case 'dashboard': return (
+              <DashboardPanel 
+                data={graphData} 
+                themeConfig={themeConfig} 
+                onNavigate={setActiveView} 
+              />
+          );
           case 'graph': return (
               <SupplyChainGraph 
                 data={graphData} 
-                width={window.innerWidth - (isSidebarCollapsed ? 80 : 256) - 400} 
-                height={window.innerHeight}
+                width={contentWidth} // Dynamic Width
+                height={windowSize.height}
                 onNodeHover={(n, x, y) => setHoveredNode({ node: n, x, y })}
                 onNodeClick={handleNodeClick}
                 selectedNodeIds={selectedNode ? [selectedNode.id] : []}
@@ -285,7 +305,13 @@ export default function App() {
                 onDataImport={() => {}}
               />
           );
-          default: return <DashboardPanel data={graphData} themeConfig={themeConfig} />;
+          default: return (
+              <DashboardPanel 
+                data={graphData} 
+                themeConfig={themeConfig} 
+                onNavigate={setActiveView} 
+              />
+          );
       }
   };
 
@@ -310,12 +336,13 @@ export default function App() {
 
   return (
     <div className={`flex h-screen overflow-hidden ${currentThemeStyles.appBg}`}>
-      {/* Sidebar */}
-      <div className={`${isSidebarCollapsed ? 'w-20' : 'w-64'} ${currentThemeStyles.sidebarBg} border-r flex flex-col transition-all duration-300 shrink-0 z-20`}>
-          <div 
-            className={`p-6 flex items-center gap-3 border-b ${currentThemeStyles.headerBorder} cursor-pointer hover:bg-black/5 transition-colors`}
+      {/* Sidebar - Increased z-index to 50 to ensure clickability */}
+      <div className={`${isSidebarCollapsed ? 'w-20' : 'w-64'} ${currentThemeStyles.sidebarBg} border-r flex flex-col transition-all duration-300 shrink-0 z-50 shadow-lg relative`}>
+          {/* Logo / Header - Explicit Button for Home */}
+          <button 
+            className={`w-full p-6 flex items-center gap-3 border-b ${currentThemeStyles.headerBorder} cursor-pointer hover:bg-black/5 transition-colors text-left focus:outline-none`}
             onClick={() => setActiveView('dashboard')}
-            title="回到首页 (Back to Dashboard)"
+            title="回到首页 / 全局看板 (Back to Dashboard)"
           >
               <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white shrink-0 shadow-sm">
                   <Network size={20} />
@@ -326,7 +353,7 @@ export default function App() {
                       <p className={`text-[10px] font-bold uppercase tracking-wider ${themeConfig.globalMode === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>Supply Chain AI</p>
                   </div>
               )}
-          </div>
+          </button>
 
           <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
               <div className="mb-6">
@@ -360,13 +387,17 @@ export default function App() {
       <div className={`flex-1 flex flex-col relative overflow-hidden ${currentThemeStyles.contentBg}`}>
           {renderContent()}
           
-          {/* Graph Tooltip */}
+          {/* Graph Tooltip - Passed handleNodeClick to onDrillDown */}
           {activeView === 'graph' && hoveredNode.node && (
-              <Tooltip node={hoveredNode.node} position={{ x: hoveredNode.x, y: hoveredNode.y }} />
+              <Tooltip 
+                node={hoveredNode.node} 
+                position={{ x: hoveredNode.x, y: hoveredNode.y }} 
+                onDrillDown={handleNodeClick}
+              />
           )}
       </div>
 
-      {/* Right Sidebar (Chat or Constraints) */}
+      {/* Right Sidebar (Chat or Constraints) - Changed from absolute to flex item */}
       {isChatOpen && activeView !== 'settings' && activeView !== 'scenario' && (
           <div className="w-96 bg-white border-l border-slate-200 shadow-xl z-30 shrink-0 flex flex-col animate-in slide-in-from-right duration-300">
               <div className="flex justify-end p-2 bg-slate-50 border-b border-slate-100">
