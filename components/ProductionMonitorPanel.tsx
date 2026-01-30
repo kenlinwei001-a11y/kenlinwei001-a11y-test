@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Factory, ChevronDown, ChevronRight, Activity, Zap, AlertTriangle, Settings } from 'lucide-react';
+import { Factory, ChevronDown, ChevronRight, Activity, Zap, AlertTriangle, Settings, User, Phone, MessageSquare, ArrowRight, ClipboardCheck } from 'lucide-react';
 
 const ProductionMonitorPanel: React.FC = () => {
   const [expandedBases, setExpandedBases] = useState<string[]>(['base-1']); // Default expand first one
@@ -39,6 +39,79 @@ const ProductionMonitorPanel: React.FC = () => {
       if (val > 80) return 'maintenance';
       return 'running';
   };
+
+  // Mock Detailed Error Data
+  const getErrorDetails = (status: string) => {
+      if (status === 'error') {
+          return {
+              code: 'E-502: 伺服电机过载',
+              reason: '卷绕机张力控制系统异常，导致极片断裂。传感器读数波动超过阈值 15%。',
+              owner: '张伟 (设备科)',
+              contact: '138-xxxx-9876',
+              suggestion: '立即停机检查伺服驱动器参数，建议更换 2# 张力传感器。',
+              progress: '维修人员已进场 (15 min)'
+          };
+      }
+      if (status === 'warning') {
+          return {
+              code: 'W-201: 湿度超标预警',
+              reason: '涂布车间除湿机效率下降，当前露点 -35℃ (标准 <-40℃)。',
+              owner: '李娜 (环境组)',
+              contact: '139-xxxx-1234',
+              suggestion: '检查除湿转轮状态，开启备用除湿机组。',
+              progress: '正在调整 (5 min)'
+          };
+      }
+      return null;
+  };
+
+  const WarningTooltip = ({ details }: { details: any }) => (
+      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-72 bg-white rounded-xl shadow-xl border border-slate-200 z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-200 pointer-events-none">
+          <div className={`px-4 py-3 border-b flex justify-between items-start ${details.code.startsWith('E') ? 'bg-red-50 border-red-100' : 'bg-amber-50 border-amber-100'}`}>
+              <div className="flex items-center gap-2">
+                  <AlertTriangle size={16} className={details.code.startsWith('E') ? 'text-red-600' : 'text-amber-600'} />
+                  <span className={`font-bold text-sm ${details.code.startsWith('E') ? 'text-red-800' : 'text-amber-800'}`}>{details.code.split(':')[0]}</span>
+              </div>
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${details.code.startsWith('E') ? 'bg-red-200 text-red-800' : 'bg-amber-200 text-amber-800'}`}>
+                  {details.code.startsWith('E') ? '异常' : '预警'}
+              </span>
+          </div>
+          <div className="p-4 space-y-3">
+              <div>
+                  <div className="text-xs text-slate-400 font-bold uppercase mb-1">原因分析</div>
+                  <div className="text-xs text-slate-700 leading-relaxed">{details.reason}</div>
+              </div>
+              <div className="flex items-center gap-3 bg-slate-50 p-2 rounded-lg border border-slate-100">
+                  <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-slate-500">
+                      <User size={14} />
+                  </div>
+                  <div>
+                      <div className="text-xs font-bold text-slate-700">{details.owner}</div>
+                      <div className="text-[10px] text-slate-400 flex items-center gap-1">
+                          <Phone size={10}/> {details.contact}
+                      </div>
+                  </div>
+                  <div className="ml-auto">
+                      <button className="text-[10px] bg-white border border-slate-300 px-2 py-1 rounded hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-200 transition-colors">
+                          呼叫
+                      </button>
+                  </div>
+              </div>
+              <div>
+                  <div className="text-xs text-slate-400 font-bold uppercase mb-1 flex items-center gap-1"><ClipboardCheck size={12}/> AI 建议</div>
+                  <div className="text-xs text-slate-600 bg-emerald-50 border border-emerald-100 p-2 rounded text-emerald-800">
+                      {details.suggestion}
+                  </div>
+              </div>
+              <div className="pt-2 border-t border-slate-100 flex justify-between items-center">
+                  <span className="text-[10px] text-slate-400">处理状态: <span className="font-bold text-slate-600">{details.progress}</span></span>
+                  <ArrowRight size={12} className="text-slate-300"/>
+              </div>
+          </div>
+          {/* Arrow */}
+          <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-white border-b border-r border-slate-200 rotate-45"></div>
+      </div>
+  );
 
   return (
     <div className="flex flex-col h-full bg-slate-50/50 w-full">
@@ -102,14 +175,23 @@ const ProductionMonitorPanel: React.FC = () => {
                                                       status === 'warning' ? 'bg-amber-400' :
                                                       status === 'error' ? 'bg-red-500' : 'bg-slate-300';
                                         
+                                        const errorDetails = (status === 'error' || status === 'warning') ? getErrorDetails(status) : null;
+
                                         return (
                                             <div key={step.id} className={`flex-1 rounded-sm ${color} relative group cursor-pointer hover:opacity-80 transition-opacity`}>
                                                 {/* Tooltip on Hover */}
-                                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block bg-slate-800 text-white text-xs px-3 py-2 rounded whitespace-nowrap z-20 shadow-lg">
-                                                    <div className="font-bold">{step.name}</div>
-                                                    <div>Status: {status === 'running' ? 'Running' : status === 'error' ? 'Fault' : 'Idle'}</div>
-                                                    <div>OEE: {status === 'running' ? '98.2%' : '0%'}</div>
-                                                </div>
+                                                {errorDetails ? (
+                                                    <div className="hidden group-hover:block">
+                                                        <WarningTooltip details={{...errorDetails, code: errorDetails.code}} />
+                                                    </div>
+                                                ) : (
+                                                    // Standard Tooltip for normal items
+                                                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block bg-slate-800 text-white text-xs px-3 py-2 rounded whitespace-nowrap z-20 shadow-lg pointer-events-none">
+                                                        <div className="font-bold">{step.name}</div>
+                                                        <div>Status: {status === 'running' ? 'Running' : 'Idle'}</div>
+                                                        <div>OEE: {status === 'running' ? '98.2%' : '0%'}</div>
+                                                    </div>
+                                                )}
                                             </div>
                                         );
                                     })}
