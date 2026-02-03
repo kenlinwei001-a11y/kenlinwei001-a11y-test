@@ -1,3 +1,4 @@
+
 import { ConstraintCategory, GraphData, NodeType, NodeData, LinkData, ScenarioEvent, ProductionLineData, OrderData } from './types';
 
 // Existing Constraints
@@ -153,13 +154,17 @@ const generateMockData = (): GraphData => {
   // 1. Suppliers (10)
   const supplierNames = ['赣锋锂业', '天齐锂业', '杉杉股份', '恩捷股份', '天赐材料', '容百科技', '当升科技', '中伟股份', '诺德股份', '璞泰来'];
   supplierNames.forEach((name, i) => {
+    // Random status
+    const rand = Math.random();
+    const status = rand > 0.9 ? 'critical' : rand > 0.8 ? 'warning' : 'normal';
+    
     nodes.push({
       id: `sup-${i}`,
       name,
       type: NodeType.SUPPLIER,
-      status: 'normal',
+      status: status as any,
       inventoryLevel: Math.floor(Math.random() * 5000) + 1000,
-      activeAlerts: Math.random() > 0.8 ? 1 : 0,
+      activeAlerts: status !== 'normal' ? 1 + Math.floor(Math.random() * 2) : 0,
       deliveryAccuracy: 95 + Math.random() * 5
     });
   });
@@ -168,16 +173,21 @@ const generateMockData = (): GraphData => {
   const baseLocations = ['常州基地', '洛阳基地', '厦门基地', '成都基地', '武汉基地', '合肥基地', '黑龙江基地', '广州基地', '江门基地', '眉山基地'];
   baseLocations.forEach((name, i) => {
     const inventory = Math.floor(Math.random() * 20000) + 5000;
+    // Random status
+    const rand = Math.random();
+    const status = rand > 0.85 ? 'critical' : rand > 0.7 ? 'warning' : 'normal';
+
     nodes.push({
       id: `base-${i}`,
       name,
       type: NodeType.BASE,
-      status: 'normal',
+      status: status as any,
       capacityUtilization: 85 + Math.random() * 10,
       inventoryLevel: inventory,
       inventoryCapacity: 30000,
       inventoryHistory: generateInventoryHistory(inventory),
       productionLines: generateProductionLines(`base-${i}`),
+      activeAlerts: status !== 'normal' ? 2 : 0,
       details: {
         batchDelivery: ['2023-W42', '2023-W44', '2023-W46'],
         monthlyForecast: [120, 130, 145, 140, 155, 160],
@@ -192,20 +202,24 @@ const generateMockData = (): GraphData => {
     // Generate Forecast (Base 5000-10000)
     const forecast = Math.floor(Math.random() * 5000) + 5000;
     
-    // Generate Target Order Volume (0.7 to 1.3 of forecast) to keep deviation < 30% typically
-    // BUT allow random distribution so some might exceed forecast (1.0 - 1.3)
+    // Generate Target Order Volume
     const ratio = 0.7 + (Math.random() * 0.6); // Range: 0.7x to 1.3x
     const targetOrderVolume = Math.floor(forecast * ratio);
+    
+    // Random status
+    const rand = Math.random();
+    const status = rand > 0.9 ? 'critical' : rand > 0.8 ? 'warning' : 'normal';
 
     nodes.push({
       id: `cust-${i}`,
       name,
       type: NodeType.CUSTOMER,
-      status: 'normal',
+      status: status as any,
       demandForecast: forecast,
       deliveryAccuracy: 92 + Math.random() * 8,
       onTimeRate: 90 + Math.random() * 10,
       activeOrders: generateOrders(`cust-${i}`, targetOrderVolume),
+      activeAlerts: status !== 'normal' ? 1 : 0,
       supplyingBases: [], // Filled during linking
       details: {
         batchDelivery: ['批次A-101', '批次B-202', '批次C-303'],
@@ -236,7 +250,7 @@ const generateMockData = (): GraphData => {
         target: `base-${baseIndex}`,
         value: flowVolume,
         type: 'material',
-        status: 'normal'
+        status: sup.status === 'critical' ? 'critical' : 'normal'
       });
     });
   });
@@ -269,7 +283,7 @@ const generateMockData = (): GraphData => {
         target: `cust-${custIndex}`,
         value: flowVolume,
         type: 'pack',
-        status: 'normal'
+        status: base.status === 'critical' ? 'critical' : 'normal'
       });
     });
   });

@@ -1,5 +1,5 @@
 {
-  "name": "产销智能推演系统",
+  "name": "智能推演模拟分析系统",
   "description": "A high-fidelity digital twin for lithium battery supply chain planning, featuring node-link visualization, constraint simulation, and AI-driven insights.",
   "requestFramePermissions": []
 }

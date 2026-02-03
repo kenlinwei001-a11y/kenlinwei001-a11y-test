@@ -1,8 +1,13 @@
 
 import React, { useState } from 'react';
 import { Factory, ChevronDown, ChevronRight, Activity, Zap, AlertTriangle, Settings, User, Phone, MessageSquare, ArrowRight, ClipboardCheck } from 'lucide-react';
+import { GraphData } from '../types';
 
-const ProductionMonitorPanel: React.FC = () => {
+interface Props {
+  data: GraphData;
+}
+
+const ProductionMonitorPanel: React.FC<Props> = ({ data }) => {
   const [expandedBases, setExpandedBases] = useState<string[]>(['base-1']); // Default expand first one
 
   const bases = [

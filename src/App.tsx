@@ -1,9 +1,11 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { GoogleGenAI } from "@google/genai";
 import { 
   LayoutDashboard, Network, TrendingUp, Package, ShoppingCart, 
-  Factory, Zap, Settings, Menu, Sparkles, X, MessageSquare
+  Factory, Zap, Settings, Menu, Sparkles, X, MessageSquare,
+  CalendarRange, BarChart3
 } from 'lucide-react';
 
 import SupplyChainGraph from './components/SupplyChainGraph';
@@ -29,6 +31,9 @@ export default function App() {
   const [hoveredNode, setHoveredNode] = useState<{ node: NodeData | null, x: number, y: number }>({ node: null, x: 0, y: 0 });
   const [selectedNode, setSelectedNode] = useState<NodeData | null>(null);
   
+  // Hover Timer Ref for Tooltip Stability
+  const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // Sidebar State
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
@@ -157,12 +162,41 @@ export default function App() {
 
   // --- Handlers ---
 
+  const handleGraphNodeHover = (node: NodeData | null, x: number, y: number) => {
+      if (node) {
+          if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+          setHoveredNode({ node, x, y });
+      } else {
+          // Delay clearing to allow moving mouse to tooltip
+          hoverTimeoutRef.current = setTimeout(() => {
+              setHoveredNode({ node: null, x: 0, y: 0 });
+          }, 200); 
+      }
+  };
+
+  const handleTooltipEnter = () => {
+      if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+  };
+
+  const handleTooltipLeave = () => {
+      hoverTimeoutRef.current = setTimeout(() => {
+          setHoveredNode({ node: null, x: 0, y: 0 });
+      }, 200);
+  };
+
   const handleNodeClick = (node: NodeData) => {
       setSelectedNode(node);
-      // Automatically switch to context relevant view or open modal
-      if (node.status === 'critical') {
+      // Automatically switch to context relevant view or open modal for anomalies
+      // Expanded condition: Critical, Warning, or any node with active alerts
+      if (node.status === 'critical' || node.status === 'warning' || (node.activeAlerts && node.activeAlerts > 0)) {
           setShowAnomalyModal(true);
       }
+  };
+
+  // Dedicated handler for "Drill Down" action from Tooltip (Force Open)
+  const handleDrillDown = (node: NodeData) => {
+      setSelectedNode(node);
+      setShowAnomalyModal(true);
   };
 
   const handleSendMessage = async (text: string, activeMCPs: string[]) => {
@@ -265,16 +299,16 @@ export default function App() {
                 data={graphData} 
                 width={contentWidth} // Dynamic Width
                 height={windowSize.height}
-                onNodeHover={(n, x, y) => setHoveredNode({ node: n, x, y })}
+                onNodeHover={handleGraphNodeHover}
                 onNodeClick={handleNodeClick}
                 selectedNodeIds={selectedNode ? [selectedNode.id] : []}
                 onBackgroundClick={() => setSelectedNode(null)}
               />
           );
-          case 'capacity': return <CapacityPanel />;
-          case 'inventory': return <InventoryPanel />;
-          case 'sales': return <SalesPanel />;
-          case 'production': return <ProductionMonitorPanel />;
+          case 'capacity': return <CapacityPanel data={graphData} />; // Passed Data
+          case 'inventory': return <InventoryPanel data={graphData} />;
+          case 'sales': return <SalesPanel data={graphData} />; // Passed Data
+          case 'production': return <ProductionMonitorPanel data={graphData} />;
           case 'scenario': return (
               <ConstraintPanel 
                 constraints={constraints}
@@ -360,9 +394,9 @@ export default function App() {
                   {!isSidebarCollapsed && <div className={`text-xs font-bold uppercase mb-3 px-2 ${themeConfig.globalMode === 'dark' ? 'text-slate-600' : 'text-slate-400'}`}>Core Modules</div>}
                   <SidebarItem id="dashboard" label="运营看板" icon={LayoutDashboard} />
                   <SidebarItem id="graph" label="全景拓扑" icon={Network} />
-                  <SidebarItem id="capacity" label="产能预测" icon={TrendingUp} />
+                  <SidebarItem id="sales" label="销售预测" icon={TrendingUp} />
+                  <SidebarItem id="capacity" label="产能规划" icon={CalendarRange} />
                   <SidebarItem id="inventory" label="库存监控" icon={Package} />
-                  <SidebarItem id="sales" label="产销协同" icon={ShoppingCart} />
                   <SidebarItem id="production" label="产线监视" icon={Factory} />
               </div>
               
@@ -387,12 +421,14 @@ export default function App() {
       <div className={`flex-1 flex flex-col relative overflow-hidden ${currentThemeStyles.contentBg}`}>
           {renderContent()}
           
-          {/* Graph Tooltip - Passed handleNodeClick to onDrillDown */}
+          {/* Graph Tooltip - Passed handleDrillDown for explicit action */}
           {activeView === 'graph' && hoveredNode.node && (
               <Tooltip 
                 node={hoveredNode.node} 
                 position={{ x: hoveredNode.x, y: hoveredNode.y }} 
-                onDrillDown={handleNodeClick}
+                onDrillDown={handleDrillDown}
+                onMouseEnter={handleTooltipEnter}
+                onMouseLeave={handleTooltipLeave}
               />
           )}
       </div>

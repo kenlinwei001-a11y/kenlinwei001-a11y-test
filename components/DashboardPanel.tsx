@@ -1,7 +1,8 @@
+
 import React, { useMemo } from 'react';
 import { GraphData, NodeType, ThemeConfig } from '../types';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Cell, PieChart, Pie, Legend, LineChart, Line, ComposedChart } from 'recharts';
-import { Activity, Package, TrendingUp, AlertTriangle, Database, Zap, Truck, Factory, BarChart4, ArrowUpRight, LayoutDashboard, Network } from 'lucide-react';
+import { AreaChart, Area, ResponsiveContainer, BarChart, Bar, Cell, PieChart, Pie, Line, ComposedChart } from 'recharts';
+import { Database, Zap, Truck, Factory, BarChart4, ArrowUpRight, LayoutDashboard, Network, Package, ShoppingCart, TrendingUp, AlertTriangle } from 'lucide-react';
 
 interface Props {
   data: GraphData;
@@ -16,11 +17,7 @@ const DashboardPanel: React.FC<Props> = ({ data, themeConfig, onNavigate }) => {
     
     // 1. Inventory Stats
     const totalInventory = nodes.reduce((sum, n) => sum + (n.inventoryLevel || 0), 0);
-    const avgInventoryUtilization = nodes
-        .filter(n => n.inventoryCapacity)
-        .reduce((sum, n) => sum + ((n.inventoryLevel || 0) / (n.inventoryCapacity || 1)), 0) / 
-        (nodes.filter(n => n.inventoryCapacity).length || 1);
-
+    
     // 2. Health Status
     const healthCounts = {
         normal: nodes.filter(n => !n.status || n.status === 'normal').length,
@@ -60,7 +57,7 @@ const DashboardPanel: React.FC<Props> = ({ data, themeConfig, onNavigate }) => {
             };
         });
 
-    return { totalInventory, avgInventoryUtilization, healthCounts, avgOEE, demandData };
+    return { totalInventory, healthCounts, avgOEE, demandData };
   }, [data]);
 
   // Mock Trend Data for Sparklines (30 Days)
@@ -120,7 +117,7 @@ const DashboardPanel: React.FC<Props> = ({ data, themeConfig, onNavigate }) => {
                     
                     <div className="flex justify-between items-start mb-6">
                         <div>
-                            <h3 className="text-lg font-bold text-slate-700 flex items-center gap-2">
+                            <h3 className="text-lg font-bold text-slate-700 flex items-center gap-2 group-hover:text-indigo-600 transition-colors">
                                 <Network size={20} className="text-indigo-500"/> 全景拓扑监控 (Network Topology)
                             </h3>
                             <p className="text-sm text-slate-500 mt-1">实时监控全网节点状态与物流路径</p>
@@ -176,7 +173,7 @@ const DashboardPanel: React.FC<Props> = ({ data, themeConfig, onNavigate }) => {
                         <ArrowUpRight size={20} className="text-orange-600"/>
                     </div>
                     <div className="mb-4">
-                        <h3 className="text-lg font-bold text-slate-700 flex items-center gap-2">
+                        <h3 className="text-lg font-bold text-slate-700 flex items-center gap-2 group-hover:text-orange-600 transition-colors">
                             <BarChart4 size={20} className="text-orange-500"/> 产能预测 (Capacity)
                         </h3>
                         <p className="text-sm text-slate-500 mt-1">12个月滚动资源规划 (RCP)</p>
@@ -203,7 +200,7 @@ const DashboardPanel: React.FC<Props> = ({ data, themeConfig, onNavigate }) => {
                         <ArrowUpRight size={20} className="text-blue-600"/>
                     </div>
                     <div className="mb-4">
-                        <h3 className="text-lg font-bold text-slate-700 flex items-center gap-2">
+                        <h3 className="text-lg font-bold text-slate-700 flex items-center gap-2 group-hover:text-blue-600 transition-colors">
                             <Database size={20} className="text-blue-500"/> 库存健康 (Inventory)
                         </h3>
                         <p className="text-sm text-slate-500 mt-1">多级库存水位监控</p>
@@ -242,7 +239,7 @@ const DashboardPanel: React.FC<Props> = ({ data, themeConfig, onNavigate }) => {
                         <ArrowUpRight size={20} className="text-emerald-600"/>
                     </div>
                     <div className="mb-4">
-                        <h3 className="text-lg font-bold text-slate-700 flex items-center gap-2">
+                        <h3 className="text-lg font-bold text-slate-700 flex items-center gap-2 group-hover:text-emerald-600 transition-colors">
                             <Package size={20} className="text-emerald-500"/> 产销协同 (S&OP)
                         </h3>
                         <p className="text-sm text-slate-500 mt-1">订单交付与需求偏差分析</p>
@@ -276,7 +273,7 @@ const DashboardPanel: React.FC<Props> = ({ data, themeConfig, onNavigate }) => {
                         <ArrowUpRight size={20} className="text-purple-600"/>
                     </div>
                     <div className="mb-4">
-                        <h3 className="text-lg font-bold text-slate-700 flex items-center gap-2">
+                        <h3 className="text-lg font-bold text-slate-700 flex items-center gap-2 group-hover:text-purple-600 transition-colors">
                             <Factory size={20} className="text-purple-500"/> 产线监视 (MES)
                         </h3>
                         <p className="text-sm text-slate-500 mt-1">实时设备效率 OEE</p>
@@ -294,12 +291,15 @@ const DashboardPanel: React.FC<Props> = ({ data, themeConfig, onNavigate }) => {
                 </div>
 
                 {/* 6. Supply App Card (Material) */}
-                <div className={`${themeConfig?.operationsColor || 'bg-white'} p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-xl hover:border-blue-300 transition-all cursor-pointer group relative`}>
+                <div 
+                    onClick={() => handleNav('graph')}
+                    className={`${themeConfig?.operationsColor || 'bg-white'} p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-xl hover:border-blue-300 transition-all cursor-pointer group relative`}
+                >
                     <div className="absolute top-4 right-4 bg-white/50 p-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
                         <ArrowUpRight size={20} className="text-blue-600"/>
                     </div>
                     <div className="mb-4">
-                        <h3 className="text-lg font-bold text-slate-700 flex items-center gap-2">
+                        <h3 className="text-lg font-bold text-slate-700 flex items-center gap-2 group-hover:text-blue-600 transition-colors">
                             <Truck size={20} className="text-blue-500"/> 物料供应 (Supply)
                         </h3>
                         <p className="text-sm text-slate-500 mt-1">上游原材料到货监控</p>

@@ -2,6 +2,11 @@
 import React, { useState } from 'react';
 import { ResponsiveContainer, ComposedChart, Line, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Area, Cell } from 'recharts';
 import { Package, AlertCircle, TrendingDown, Clock, MapPin, Layers, AlertTriangle } from 'lucide-react';
+import { GraphData } from '../types';
+
+interface Props {
+  data: GraphData;
+}
 
 // Custom Types for detailed inventory
 interface InventoryDataPoint {
@@ -21,7 +26,7 @@ interface InventoryDataPoint {
   };
 }
 
-const InventoryPanel: React.FC = () => {
+const InventoryPanel: React.FC<Props> = ({ data }) => {
   const [filterTech, setFilterTech] = useState<'ALL' | 'LFP' | 'NCM'>('ALL');
 
   // Mock Data Generator based on filter

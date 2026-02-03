@@ -1,92 +1,98 @@
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { ResponsiveContainer, ComposedChart, Line, Bar, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Cell, ReferenceLine } from 'recharts';
-import { Factory, Users, Box, Zap, AlertTriangle, TrendingUp, Calendar, ChevronRight, Settings, CheckCircle2, AlertOctagon } from 'lucide-react';
+import { Factory, Users, Box, Zap, AlertTriangle, TrendingUp, Calendar, ChevronRight, Settings, CheckCircle2, AlertOctagon, ChevronDown, CalendarRange } from 'lucide-react';
+import { GraphData, NodeType } from '../types';
 
-// --- Mock Data Generators ---
+interface Props {
+    data: GraphData;
+}
 
+// Fixed process steps for the industry
 const PROCESS_STEPS = [
-    { id: 'proc_mix', name: '正极搅拌 (Mixing)', type: 'batch' },
-    { id: 'proc_coat', name: '高速涂布 (Coating)', type: 'continuous' },
-    { id: 'proc_roll', name: '辊压分切 (Calendaring)', type: 'continuous' },
-    { id: 'proc_cell', name: '电芯卷绕 (Winding)', type: 'discrete' },
-    { id: 'proc_form', name: '化成定容 (Formation)', type: 'batch' },
-    { id: 'proc_pack', name: 'Pack组装 (Assembly)', type: 'discrete' }
+    { id: 'proc_mix', name: '搅拌 (Mix)', type: 'batch' },
+    { id: 'proc_coat', name: '涂布 (Coat)', type: 'continuous' },
+    { id: 'proc_roll', name: '辊压 (Roll)', type: 'continuous' },
+    { id: 'proc_cell', name: '卷绕 (Wind)', type: 'discrete' },
+    { id: 'proc_form', name: '化成 (Form)', type: 'batch' },
+    { id: 'proc_pack', name: 'Pack (Assy)', type: 'discrete' }
 ];
 
-const generateForecastData = () => {
-    return Array.from({ length: 12 }, (_, i) => {
-        const month = i + 1;
-        const monthLabel = `2024-${(month + 9) % 12 + 1 || 12}月`; // Rolling from Oct
-        
-        // Base Capacity (Theoretical)
-        const maxCap = 12000; 
-        
-        // Planned Maintenance impact (e.g., Month 2 and 8)
-        const maintenanceLoss = (i === 1 || i === 7) ? 2500 : 0;
-        
-        // Effective Capacity
-        const effectiveCap = maxCap - maintenanceLoss;
+const CapacityPanel: React.FC<Props> = ({ data }) => {
+    // 1. Get Actual Bases from Graph Data
+    const bases = useMemo(() => {
+        return data.nodes.filter(n => n.type === NodeType.BASE);
+    }, [data]);
 
-        // Demand Forecast (Growing)
-        const demand = 8000 + (i * 350) + (Math.random() * 1000);
-
-        // Gap
-        const gap = demand - effectiveCap;
-
-        return {
-            name: monthLabel,
-            maxCapacity: maxCap,
-            effectiveCapacity: effectiveCap,
-            demand: Math.floor(demand),
-            gap: Math.floor(gap),
-            utilization: (demand / effectiveCap) * 100,
-            isBottleneck: demand > effectiveCap
-        };
-    });
-};
-
-const generateDrillDownData = (monthIndex: number) => {
-    // Simulate specific constraints for a selected month
-    return PROCESS_STEPS.map((proc, idx) => {
-        // Randomize status based on process index and month to simulate shifting bottlenecks
-        const load = 70 + (monthIndex * 2) + (Math.random() * 20); // Growing load
-        let status: 'normal' | 'warning' | 'critical' = 'normal';
-        let constraintType = '';
-        let details = '';
-
-        if (load > 95) {
-            status = 'critical';
-            // Determine random cause
-            const r = Math.random();
-            if (r > 0.6) { constraintType = 'material'; details = 'NCM主材缺货'; }
-            else if (r > 0.3) { constraintType = 'labor'; details = '夜班人力不足'; }
-            else { constraintType = 'equipment'; details = '设备OEE下降'; }
-        } else if (load > 85) {
-            status = 'warning';
-        }
-
-        return {
-            ...proc,
-            load: Math.min(100, Math.floor(load)),
-            status,
-            constraintType,
-            details,
-            metrics: {
-                material: Math.floor(80 + Math.random() * 20), // Material Availability %
-                labor: Math.floor(85 + Math.random() * 15),    // Labor Fill Rate %
-                equipment: Math.floor(88 + Math.random() * 12) // OEE %
-            }
-        };
-    });
-};
-
-const CapacityPanel: React.FC = () => {
-    const [forecastData] = useState(generateForecastData());
+    const [selectedBaseId, setSelectedBaseId] = useState<string>(bases[0]?.id || '');
     const [selectedMonthIndex, setSelectedMonthIndex] = useState<number>(0);
-    
-    // Derived data for the bottom view
-    const drillDownData = generateDrillDownData(selectedMonthIndex);
+
+    const selectedBase = bases.find(b => b.id === selectedBaseId) || bases[0];
+
+    // 2. Generate Forecast Data (Simulated relative to selected base capacity)
+    const forecastData = useMemo(() => {
+        const baseCap = selectedBase?.inventoryCapacity || 10000;
+        return Array.from({ length: 12 }, (_, i) => {
+            const month = i + 1;
+            const monthLabel = `2024-${(month + 9) % 12 + 1 || 12}月`;
+            
+            // Capacity Logic
+            const maxCap = baseCap * 1.2; // Theoretical max slightly higher than inventory cap
+            const maintenanceLoss = (i === 1 || i === 7) ? maxCap * 0.2 : 0;
+            const effectiveCap = maxCap - maintenanceLoss;
+
+            // Demand Forecast (Randomized around capacity)
+            const demand = maxCap * (0.8 + Math.random() * 0.4); 
+            const gap = demand - effectiveCap;
+
+            return {
+                name: monthLabel,
+                maxCapacity: maxCap,
+                effectiveCapacity: effectiveCap,
+                demand: Math.floor(demand),
+                gap: Math.floor(gap),
+                utilization: Math.min(100, (demand / effectiveCap) * 100),
+                isBottleneck: demand > effectiveCap
+            };
+        });
+    }, [selectedBase]);
+
+    // 3. Generate Drill-Down Process Data
+    const drillDownData = useMemo(() => {
+        if (!selectedBase) return [];
+        const baseFactor = (selectedBase.inventoryLevel || 5000) / 10000;
+        
+        return PROCESS_STEPS.map((proc, idx) => {
+            // Randomize status based on base health and index
+            const load = 75 + (idx * 3) + (baseFactor * 10) + (Math.random() * 10);
+            let status: 'normal' | 'warning' | 'critical' = 'normal';
+            let constraintType = '';
+            let details = '';
+
+            // Use the base's overall status to influence process status
+            if (selectedBase.status === 'critical' && idx === 4) { // Simulate critical formation bottleneck
+                 status = 'critical';
+                 constraintType = 'equipment'; 
+                 details = '化成柜容量不足';
+            } else if (load > 92) {
+                status = 'warning';
+            }
+
+            return {
+                ...proc,
+                load: Math.min(100, Math.floor(load)),
+                status,
+                constraintType,
+                details,
+                metrics: {
+                    material: Math.floor(90 + Math.random() * 10),
+                    labor: Math.floor(88 + Math.random() * 12),
+                    equipment: Math.floor(92 + Math.random() * 8)
+                }
+            };
+        });
+    }, [selectedBase, selectedMonthIndex]);
+
     const selectedMonthData = forecastData[selectedMonthIndex];
 
     const CustomTooltip = ({ active, payload, label }: any) => {
@@ -95,12 +101,12 @@ const CapacityPanel: React.FC = () => {
                 <div className="bg-white p-3 border border-slate-200 rounded shadow-lg text-sm">
                     <div className="font-bold text-slate-700 mb-2">{label}</div>
                     <div className="space-y-1">
-                        <div className="text-emerald-600 font-medium">有效产能: {payload[0].payload.effectiveCapacity} Units</div>
-                        <div className="text-blue-600 font-medium">需求预测: {payload[0].payload.demand} Units</div>
+                        <div className="text-emerald-600 font-medium">有效产能: {payload[0].payload.effectiveCapacity.toFixed(0)}</div>
+                        <div className="text-blue-600 font-medium">需求预测: {payload[0].payload.demand}</div>
                         <div className={`font-bold ${payload[0].payload.gap > 0 ? 'text-red-500' : 'text-slate-400'}`}>
                             {payload[0].payload.gap > 0 ? `缺口: -${payload[0].payload.gap}` : '产能充足'}
                         </div>
-                        <div className="text-xs text-slate-400 mt-1">稼动率: {payload[0].payload.utilization.toFixed(1)}%</div>
+                        <div className="text-xs text-slate-400 mt-1">利用率: {payload[0].payload.utilization.toFixed(1)}%</div>
                     </div>
                 </div>
             );
@@ -114,19 +120,19 @@ const CapacityPanel: React.FC = () => {
             <div className="p-6 border-b border-slate-200 bg-white sticky top-0 z-10 flex justify-between items-center">
                 <div>
                     <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-                        <TrendingUp className="text-orange-600" size={24} />
-                        12个月滚动产能预测 (RCP)
+                        <CalendarRange className="text-orange-600" size={24} />
+                        产能规划 (Capacity Planning)
                     </h2>
                     <p className="text-sm text-slate-500 mt-1">Rolling Capacity Planning & Constraint Analysis</p>
                 </div>
                 <div className="flex gap-3">
                     <div className="bg-orange-50 text-orange-700 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-2 border border-orange-100">
                         <AlertTriangle size={14}/>
-                        发现 {forecastData.filter(d => d.isBottleneck).length} 个产能瓶颈月
+                        发现 {forecastData.filter(d => d.isBottleneck).length} 个瓶颈月份
                     </div>
                     <div className="bg-white border border-slate-200 text-slate-600 px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-2">
                         <Calendar size={14}/>
-                        预测版本: V2024-W42
+                        预测版本: V2024-W46
                     </div>
                 </div>
             </div>
@@ -135,9 +141,25 @@ const CapacityPanel: React.FC = () => {
                 
                 {/* 1. Macro Chart */}
                 <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-                    <h3 className="text-sm font-bold text-slate-500 uppercase mb-4 flex items-center gap-2">
-                        <Factory size={16}/> 供需平衡全景图 (Demand vs. Capacity)
-                    </h3>
+                    <div className="flex justify-between items-center mb-6">
+                        <h3 className="text-sm font-bold text-slate-500 uppercase flex items-center gap-2">
+                            <Factory size={16}/> 供需平衡全景图 (Demand vs. Capacity)
+                        </h3>
+                        {/* Base Switcher */}
+                        <div className="relative">
+                            <select 
+                                value={selectedBaseId}
+                                onChange={(e) => setSelectedBaseId(e.target.value)}
+                                className="appearance-none bg-slate-50 border border-slate-200 hover:border-indigo-300 text-slate-700 text-sm font-bold rounded-lg pl-3 pr-8 py-2 outline-none cursor-pointer transition-all focus:ring-2 focus:ring-indigo-100"
+                            >
+                                {bases.map(b => (
+                                    <option key={b.id} value={b.id}>{b.name}</option>
+                                ))}
+                            </select>
+                            <ChevronDown size={14} className="absolute right-3 top-3 text-slate-400 pointer-events-none"/>
+                        </div>
+                    </div>
+
                     <div className="h-80 w-full">
                         <ResponsiveContainer width="100%" height="100%">
                             <ComposedChart 
@@ -145,7 +167,7 @@ const CapacityPanel: React.FC = () => {
                                 margin={{top: 20, right: 20, bottom: 20, left: 0}}
                                 onClick={(e) => {
                                     if (e && e.activeTooltipIndex !== undefined) {
-                                        setSelectedMonthIndex(e.activeTooltipIndex);
+                                        setSelectedMonthIndex(Number(e.activeTooltipIndex));
                                     }
                                 }}
                             >
@@ -156,13 +178,8 @@ const CapacityPanel: React.FC = () => {
                                 <Tooltip content={<CustomTooltip />} />
                                 <Legend wrapperStyle={{fontSize: '12px', paddingTop: '10px'}}/>
                                 
-                                {/* Background Area for Max Capacity */}
                                 <Area yAxisId="left" type="monotone" dataKey="maxCapacity" name="设计产能上限" fill="#f8fafc" stroke="none" />
-                                
-                                {/* Effective Capacity Line */}
-                                <Line yAxisId="left" type="step" dataKey="effectiveCapacity" name="有效产能 (含维保)" stroke="#10b981" strokeWidth={3} dot={false} />
-                                
-                                {/* Demand Bar */}
+                                <Line yAxisId="left" type="step" dataKey="effectiveCapacity" name="有效产能" stroke="#10b981" strokeWidth={3} dot={false} />
                                 <Bar yAxisId="left" dataKey="demand" name="需求预测" barSize={32} radius={[4, 4, 0, 0]}>
                                     {forecastData.map((entry, index) => (
                                         <Cell 
@@ -173,16 +190,13 @@ const CapacityPanel: React.FC = () => {
                                         />
                                     ))}
                                 </Bar>
-
-                                {/* Utilization Line */}
                                 <Line yAxisId="right" type="monotone" dataKey="utilization" name="产能利用率" stroke="#f59e0b" strokeWidth={2} dot={{r: 3}} />
-                                
-                                <ReferenceLine yAxisId="right" y={100} stroke="red" strokeDasharray="3 3" label={{ position: 'right', value: '100%', fill: 'red', fontSize: 10 }} />
+                                <ReferenceLine yAxisId="right" y={100} stroke="red" strokeDasharray="3 3" />
                             </ComposedChart>
                         </ResponsiveContainer>
                     </div>
                     <div className="mt-2 text-center text-xs text-slate-400">
-                        * 点击柱状图可切换下方详情分析视图
+                        * 点击柱状图可切换下方工序级详情分析
                     </div>
                 </div>
 
@@ -190,10 +204,10 @@ const CapacityPanel: React.FC = () => {
                 <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden animate-in slide-in-from-bottom-2 fade-in duration-500">
                     <div className="p-5 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
                         <div className="flex items-center gap-3">
-                            <span className="text-xl font-bold text-slate-800">{selectedMonthData.name}</span>
-                            <span className="text-sm text-slate-500 font-medium">瓶颈溯源与资源分析</span>
+                            <span className="text-xl font-bold text-slate-800">{selectedMonthData?.name}</span>
+                            <span className="text-sm text-slate-500 font-medium">瓶颈溯源与资源分析 @ {selectedBase?.name}</span>
                         </div>
-                        {selectedMonthData.isBottleneck ? (
+                        {selectedMonthData?.isBottleneck ? (
                             <span className="flex items-center gap-2 bg-red-100 text-red-700 px-4 py-1.5 rounded-full text-sm font-bold">
                                 <AlertOctagon size={16}/> 产能缺口: -{selectedMonthData.gap} Units
                             </span>
@@ -265,7 +279,7 @@ const CapacityPanel: React.FC = () => {
                                     {/* Equipment Metric */}
                                     <div className="col-span-2 flex flex-col items-center border-l border-slate-100/50">
                                         <div className="flex items-center gap-1.5 text-xs text-slate-500 mb-1">
-                                            <Settings size={12}/> OEE
+                                            <Zap size={12}/> OEE
                                         </div>
                                         <div className={`font-bold font-mono text-sm ${proc.metrics.equipment < 85 ? 'text-red-600' : 'text-slate-700'}`}>
                                             {proc.metrics.equipment}%

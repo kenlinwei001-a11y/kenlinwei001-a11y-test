@@ -15,8 +15,26 @@ interface TooltipProps {
 const Tooltip: React.FC<TooltipProps> = ({ node, position, onDrillDown, onMouseEnter, onMouseLeave }) => {
   if (!node || !position) return null;
 
+  // Screen Boundary Logic
+  const tooltipWidth = 320;
+  const tooltipHeight = 400; // Approx max height
+  
+  let left = position.x + 20;
+  let top = position.y - 120;
+
+  // Check Right Edge
+  if (left + tooltipWidth > window.innerWidth) {
+      left = position.x - tooltipWidth - 20;
+  }
+  
+  // Check Top/Bottom Edge (Simple clamp)
+  if (top < 20) top = 20;
+  if (top + tooltipHeight > window.innerHeight) top = window.innerHeight - tooltipHeight - 20;
+
+
   const handleDrillDownClick = (e: React.MouseEvent) => {
     e.stopPropagation(); // Prevent propagation
+    e.preventDefault();
     if (onDrillDown && node) {
         onDrillDown(node);
     }
@@ -221,8 +239,8 @@ const Tooltip: React.FC<TooltipProps> = ({ node, position, onDrillDown, onMouseE
     <div
       className="fixed z-50 w-80 bg-white/95 backdrop-blur-md border border-slate-200 shadow-xl rounded-lg overflow-hidden transition-opacity duration-200 fade-in pointer-events-auto" 
       style={{
-        left: position.x + 20,
-        top: position.y - 120, // Shifted up slightly to accommodate larger content
+        left: left,
+        top: top,
         opacity: node ? 1 : 0,
         pointerEvents: node ? 'auto' : 'none' // Crucial change: Allow pointer events when visible
       }}

@@ -1,55 +1,117 @@
 
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
-import { ShoppingCart, Filter, Download } from 'lucide-react';
+import { ShoppingCart, Filter, Download, Search, TrendingUp } from 'lucide-react';
+import { GraphData, NodeType, OrderData } from '../types';
 
-const SalesPanel: React.FC = () => {
-  // Mock Data: 12 Months Forecast vs Orders
-  const forecastData = Array.from({ length: 12 }, (_, i) => {
-    const month = i + 1;
-    const forecast = Math.floor(Math.random() * 50) + 100; // GWh
-    return {
-      name: `2024-${month.toString().padStart(2, '0')}`,
-      forecast: forecast,
-      orders: Math.floor(forecast * (0.8 + Math.random() * 0.3)), // GWh
-    };
-  });
+interface Props {
+    data: GraphData;
+}
 
-  // Detailed Order Data (Lithium Industry Specifics)
-  const orderDetails = [
-    { id: 'ORD-2410-001', customer: '小鹏汽车', type: '动力', tech: 'NCM811', format: '方壳', model: 'XP-590', qty: '12,000', unit: 'Packs', status: 'In Prod' },
-    { id: 'ORD-2410-002', customer: '广汽埃安', type: '动力', tech: 'LFP', format: '弹匣', model: 'Y76', qty: '45,000', unit: 'Cells', status: 'Delayed' },
-    { id: 'ORD-2410-003', customer: '国家电网', type: '储能', tech: 'LFP', format: '方壳', model: '280Ah', qty: '80,000', unit: 'Cells', status: 'Planned' },
-    { id: 'ORD-2410-004', customer: '长安深蓝', type: '动力', tech: 'NCM523', format: '软包', model: 'SL-03', qty: '8,500', unit: 'Packs', status: 'In Prod' },
-    { id: 'ORD-2410-005', customer: '零跑汽车', type: '动力', tech: 'LFP', format: '圆柱', model: '4680', qty: '120,000', unit: 'Cells', status: 'In Prod' },
-    { id: 'ORD-2410-006', customer: '出口-BMW', type: '动力', tech: 'NCM811', format: '方壳', model: 'Gen5', qty: '15,000', unit: 'Packs', status: 'Shipping' },
-  ];
+const SalesPanel: React.FC<Props> = ({ data }) => {
+  const [customerFilter, setCustomerFilter] = useState<string>('ALL');
+
+  // 1. Aggregate Forecast vs Orders (Aggregated across all Customers)
+  const forecastChartData = useMemo(() => {
+      const customers = data.nodes.filter(n => n.type === NodeType.CUSTOMER);
+      
+      // Initialize rolling 12 months buckets
+      const buckets = Array.from({ length: 12 }, (_, i) => {
+          const m = i + 1; // 1 to 12
+          return {
+              name: `2024-${m.toString().padStart(2, '0')}`,
+              forecast: 0,
+              orders: 0
+          };
+      });
+
+      customers.forEach(cust => {
+          if (cust.details?.monthlyForecast) {
+              cust.details.monthlyForecast.forEach((val, idx) => {
+                  if (idx < 12) buckets[idx].forecast += val;
+              });
+          }
+          // Simple heuristic to distribute orders into buckets based on due date
+          if (cust.activeOrders) {
+              cust.activeOrders.forEach(order => {
+                  const date = new Date(order.dueDate);
+                  const monthIdx = date.getMonth(); // 0-11
+                  if (monthIdx >= 0 && monthIdx < 12) {
+                      buckets[monthIdx].orders += order.volume;
+                  }
+              });
+          }
+      });
+
+      return buckets;
+  }, [data]);
+
+  // 2. Flatten Order List
+  const allOrders = useMemo(() => {
+      const orders: (OrderData & { customerName: string })[] = [];
+      const customers = customerFilter === 'ALL' 
+        ? data.nodes.filter(n => n.type === NodeType.CUSTOMER)
+        : data.nodes.filter(n => n.type === NodeType.CUSTOMER && n.id === customerFilter);
+
+      customers.forEach(cust => {
+          if (cust.activeOrders) {
+              cust.activeOrders.forEach(o => {
+                  orders.push({ ...o, customerName: cust.name });
+              });
+          }
+      });
+      return orders;
+  }, [data, customerFilter]);
+
+  // Unique customers for filter
+  const customerOptions = useMemo(() => {
+      return data.nodes
+        .filter(n => n.type === NodeType.CUSTOMER)
+        .map(n => ({ id: n.id, name: n.name }));
+  }, [data]);
 
   return (
     <div className="flex flex-col h-full bg-slate-50/50 w-full">
-      <div className="p-6 border-b border-slate-200 bg-white sticky top-0 z-10">
-        <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-          <ShoppingCart className="text-emerald-600" size={24}/>
-          产销计划协同 (S&OP)
-        </h2>
-        <p className="text-sm text-slate-500 mt-1">Sales Forecast & Production Orders</p>
+      <div className="p-6 border-b border-slate-200 bg-white sticky top-0 z-10 flex justify-between items-center">
+        <div>
+            <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+            <TrendingUp className="text-emerald-600" size={24}/>
+            销售预测 (Sales Forecast)
+            </h2>
+            <p className="text-sm text-slate-500 mt-1">Rolling Forecast & Order Book Management</p>
+        </div>
+        <div className="flex gap-2">
+            <div className="relative">
+                <select 
+                    className="appearance-none bg-slate-100 border border-transparent hover:border-slate-300 text-slate-600 text-sm font-bold rounded-lg pl-3 pr-8 py-2 outline-none cursor-pointer transition-all"
+                    value={customerFilter}
+                    onChange={(e) => setCustomerFilter(e.target.value)}
+                >
+                    <option value="ALL">全部客户</option>
+                    {customerOptions.map(c => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                </select>
+                <Filter size={14} className="absolute right-3 top-3 text-slate-400 pointer-events-none"/>
+            </div>
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto p-6 space-y-6">
         
         {/* Chart: Forecast vs Actual */}
         <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
-            <h3 className="text-sm font-bold text-slate-500 uppercase mb-4">12个月销售预测 vs 实际排产 (GWh)</h3>
+            <h3 className="text-sm font-bold text-slate-500 uppercase mb-4">12个月滚动预测 vs 实际订单 (Aggregate Units)</h3>
             <div className="h-64 w-full">
                 <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={forecastData} margin={{top: 10, right: 10, left: -20, bottom: 0}}>
+                    <BarChart data={forecastChartData} margin={{top: 10, right: 10, left: -10, bottom: 0}}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9"/>
                         <XAxis dataKey="name" tick={{fontSize: 12}} tickLine={false} axisLine={false}/>
                         <YAxis tick={{fontSize: 12}} tickLine={false} axisLine={false}/>
                         <Tooltip contentStyle={{fontSize: '14px'}} cursor={{fill: '#f8fafc'}}/>
                         <Legend wrapperStyle={{fontSize: '12px'}}/>
                         <Bar dataKey="forecast" name="销售预测" fill="#e2e8f0" radius={[4, 4, 0, 0]} />
-                        <Bar dataKey="orders" name="确 认订单" fill="#10b981" radius={[4, 4, 0, 0]} />
+                        <Bar dataKey="orders" name="确认订单" fill="#10b981" radius={[4, 4, 0, 0]} />
                     </BarChart>
                 </ResponsiveContainer>
             </div>
@@ -58,60 +120,64 @@ const SalesPanel: React.FC = () => {
         {/* Detailed Order Table */}
         <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
             <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-                 <h3 className="text-sm font-bold text-slate-500 uppercase">重点在产订单明细</h3>
-                 <div className="flex gap-2">
-                    <button className="p-2 hover:bg-white rounded border border-transparent hover:border-slate-200 text-slate-400 hover:text-slate-600 transition-colors">
-                        <Filter size={16}/>
-                    </button>
-                    <button className="p-2 hover:bg-white rounded border border-transparent hover:border-slate-200 text-slate-400 hover:text-slate-600 transition-colors">
-                        <Download size={16}/>
-                    </button>
-                 </div>
+                 <h3 className="text-sm font-bold text-slate-500 uppercase flex items-center gap-2">
+                     <Search size={16}/> 重点在产订单明细 ({allOrders.length})
+                 </h3>
+                 <button className="p-2 hover:bg-white rounded border border-transparent hover:border-slate-200 text-slate-400 hover:text-slate-600 transition-colors">
+                    <Download size={16}/>
+                 </button>
             </div>
             <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm">
-                    <thead className="bg-slate-50 text-slate-500 font-semibold">
+                    <thead className="bg-slate-50 text-slate-500 font-semibold text-xs uppercase tracking-wider">
                         <tr>
-                            <th className="px-4 py-3">订单号/客户</th>
-                            <th className="px-4 py-3">技术路线</th>
+                            <th className="px-4 py-3">客户 / 订单号</th>
                             <th className="px-4 py-3">产品型号</th>
-                            <th className="px-4 py-3 text-right">排产数量</th>
+                            <th className="px-4 py-3 text-right">数量</th>
+                            <th className="px-4 py-3 text-center">排产进度</th>
+                            <th className="px-4 py-3 text-right">交付日</th>
                             <th className="px-4 py-3 text-center">状态</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                        {orderDetails.map((order, i) => (
-                            <tr key={i} className="hover:bg-slate-50 group cursor-pointer">
+                        {allOrders.map((order, i) => (
+                            <tr key={i} className="hover:bg-slate-50 group cursor-pointer transition-colors">
                                 <td className="px-4 py-3">
-                                    <div className="font-bold text-slate-700">{order.customer}</div>
-                                    <div className="text-xs text-slate-400 font-mono mt-0.5">{order.id}</div>
+                                    <div className="font-bold text-slate-700">{order.customerName}</div>
+                                    <div className="text-[10px] text-slate-400 font-mono mt-0.5">{order.id}</div>
                                 </td>
-                                <td className="px-4 py-3">
-                                    <div className="flex items-center gap-2">
-                                        <span className={`px-2 py-0.5 rounded text-xs font-bold ${order.type === '动力' ? 'bg-blue-50 text-blue-600' : 'bg-amber-50 text-amber-600'}`}>
-                                            {order.type}
-                                        </span>
-                                        <span className="text-slate-600">{order.tech}</span>
+                                <td className="px-4 py-3 text-slate-600 font-medium">
+                                    {order.product}
+                                </td>
+                                <td className="px-4 py-3 text-right font-mono text-slate-700 font-bold">
+                                    {order.volume.toLocaleString()}
+                                </td>
+                                <td className="px-4 py-3 align-middle w-32">
+                                    <div className="w-full bg-slate-100 rounded-full h-1.5 mb-1">
+                                        <div 
+                                            className={`h-1.5 rounded-full ${order.status === 'delayed' ? 'bg-red-400' : 'bg-emerald-400'}`} 
+                                            style={{width: `${order.progress}%`}}
+                                        ></div>
                                     </div>
+                                    <div className="text-[10px] text-center text-slate-400">{order.progress}%</div>
                                 </td>
-                                <td className="px-4 py-3 text-slate-600">
-                                    <div className="font-medium">{order.model}</div>
-                                    <div className="text-xs text-slate-400">{order.format}</div>
-                                </td>
-                                <td className="px-4 py-3 text-right font-mono text-slate-700">
-                                    <span className="font-bold">{order.qty}</span>
-                                    <span className="ml-1 text-xs text-slate-400">{order.unit}</span>
+                                <td className="px-4 py-3 text-right font-mono text-slate-600 text-xs">
+                                    {order.dueDate}
                                 </td>
                                 <td className="px-4 py-3 text-center">
-                                    <span className={`inline-block w-2.5 h-2.5 rounded-full ${
-                                        order.status === 'In Prod' ? 'bg-emerald-500 animate-pulse' :
-                                        order.status === 'Delayed' ? 'bg-red-500' :
-                                        order.status === 'Shipping' ? 'bg-blue-500' : 'bg-slate-300'
-                                    }`}></span>
-                                    <div className="text-xs mt-1 text-slate-500">{order.status}</div>
+                                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                                        order.status === 'on-track' ? 'bg-emerald-50 text-emerald-600' :
+                                        order.status === 'delayed' ? 'bg-red-50 text-red-600' :
+                                        'bg-amber-50 text-amber-600'
+                                    }`}>
+                                        {order.status}
+                                    </span>
                                 </td>
                             </tr>
                         ))}
+                        {allOrders.length === 0 && (
+                            <tr><td colSpan={6} className="text-center py-8 text-slate-400">无符合条件的订单数据</td></tr>
+                        )}
                     </tbody>
                 </table>
             </div>
